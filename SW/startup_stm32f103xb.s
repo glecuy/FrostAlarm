@@ -1,0 +1,1 @@
+../STM32SW/startup_stm32f103xb.s
