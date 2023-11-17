@@ -183,6 +183,22 @@ $(BUILD_DIR)/%.bin: $(BUILD_DIR)/%.elf | $(BUILD_DIR)
 $(BUILD_DIR):
 	mkdir $@
 
+
+#
+#  STLINK:           Controller
+#
+#     2      SWDIO
+#     4      GND
+#     6      SWCLK
+#     8      VCC-3.3
+#
+flash:
+	st-flash write $(BUILD_DIR)/$(TARGET).bin 0x08000000
+
+info:
+	st-flash --area=optcr read
+	st-flash --area=option_boot_add read
+
 #######################################
 # clean up
 #######################################

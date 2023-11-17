@@ -65,6 +65,22 @@ void Error_Handler(void);
 #define UserLED_Pin GPIO_PIN_13
 #define UserLED_GPIO_Port GPIOC
 
+
+#define UserLED_toggle() HAL_GPIO_TogglePin (UserLED_GPIO_Port, UserLED_Pin)
+//#define UserLED_on() HAL_GPIO_WritePin  (UserLED_GPIO_Port, UserLED_Pin, GPIO_PIN_SET)
+//#define UserLED_off() HAL_GPIO_WritePin (UserLED_GPIO_Port, UserLED_Pin, GPIO_PIN_RESET)
+#define UserLED_on() HAL_GPIO_WritePin  (UserLED_GPIO_Port, UserLED_Pin, GPIO_PIN_RESET)
+#define UserLED_off() HAL_GPIO_WritePin (UserLED_GPIO_Port, UserLED_Pin, GPIO_PIN_SET)
+
+
+#define LED3_Pin GPIO_PIN_7
+#define LED3_GPIO_Port GPIOA
+
+#define LED3_toggle()   HAL_GPIO_TogglePin (LED3_GPIO_Port, LED3_Pin)
+#define LED3_on()       HAL_GPIO_WritePin  (LED3_GPIO_Port, LED3_Pin, GPIO_PIN_RESET)
+#define LED3_off()      HAL_GPIO_WritePin  (LED3_GPIO_Port, LED3_Pin, GPIO_PIN_SET)
+
+
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus
