@@ -73,12 +73,27 @@ void Error_Handler(void);
 #define UserLED_off() HAL_GPIO_WritePin (UserLED_GPIO_Port, UserLED_Pin, GPIO_PIN_SET)
 
 
+#define LED1_Pin GPIO_PIN_5
+#define LED1_GPIO_Port GPIOA
+
+#define LED1_toggle()   HAL_GPIO_TogglePin (LED3_GPIO_Port, LED1_Pin)
+#define LED1_on()       HAL_GPIO_WritePin  (LED3_GPIO_Port, LED1_Pin, GPIO_PIN_SET)
+#define LED1_off()      HAL_GPIO_WritePin  (LED3_GPIO_Port, LED1_Pin, GPIO_PIN_RESET)
+
+#define LED2_Pin GPIO_PIN_6
+#define LED2_GPIO_Port GPIOA
+
+#define LED2_toggle()   HAL_GPIO_TogglePin (LED3_GPIO_Port, LED2_Pin)
+#define LED2_on()       HAL_GPIO_WritePin  (LED3_GPIO_Port, LED2_Pin, GPIO_PIN_SET)
+#define LED2_off()      HAL_GPIO_WritePin  (LED3_GPIO_Port, LED2_Pin, GPIO_PIN_RESET)
+
 #define LED3_Pin GPIO_PIN_7
 #define LED3_GPIO_Port GPIOA
 
 #define LED3_toggle()   HAL_GPIO_TogglePin (LED3_GPIO_Port, LED3_Pin)
-#define LED3_on()       HAL_GPIO_WritePin  (LED3_GPIO_Port, LED3_Pin, GPIO_PIN_RESET)
-#define LED3_off()      HAL_GPIO_WritePin  (LED3_GPIO_Port, LED3_Pin, GPIO_PIN_SET)
+#define LED3_on()       HAL_GPIO_WritePin  (LED3_GPIO_Port, LED3_Pin, GPIO_PIN_SET)
+#define LED3_off()      HAL_GPIO_WritePin  (LED3_GPIO_Port, LED3_Pin, GPIO_PIN_RESET)
+
 
 
 /* USER CODE END Private defines */

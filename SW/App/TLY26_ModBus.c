@@ -73,13 +73,10 @@ static bool TLY26_ReadFrame( uint16_t * pData, uint16_t n ){
 
     memset(ModBusFrame, 0, n );
 
-    LED3_off();
     //st = HAL_UART_Receive(&huart2, ModBusFrame, n, 10);
     st = HAL_UART_Receive(&huart2, ModBusFrame, n, 20);
-    LED3_on();
 
-    DumpFrame(n);
-    //UART_printf( "NB=%d (%02X %02X)\r\n", (int)ModBusFrame[2], (int)ModBusFrame[0], (int)ModBusFrame[1] );
+    //DumpFrame(n);
 
     uint16_t w;
     uint8_t *ptr = &ModBusFrame[3];

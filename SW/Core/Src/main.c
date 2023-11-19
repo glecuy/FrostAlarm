@@ -25,6 +25,7 @@
 #include "TLY26_ModBus.h"
 #include "UART_Printf.h"
 #include "SIM_800L.h"
+#include "Temperature.h"
 
 /* USER CODE END Includes */
 
@@ -102,36 +103,47 @@ int main(void)
   MX_USART3_UART_Init();
   MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
+    {
+        bool rc;
+        uint32_t prevTick=0;
+        uint16_t Data[4];
 
-  TLY26_Init( 0x1 );
+        UserLED_off();
 
-  uint32_t prevTick=0;
+        TLY26_Init( 0x1 );
 
-  /* USER CODE END 2 */
+        Temp_HistoryInit();
 
-  uint16_t Data[4];
+        UART_printf( "Hello world ...\r\n");
 
 
-  UART_printf( "Hello world ...\r\n");
-  bool rc;
-  /* Infinite loop */
-  /* USER CODE BEGIN WHILE */
-  while (1)
-  {
-    /* USER CODE END WHILE */
-    uint32_t t = HAL_GetTick();
-    if ( t >= (prevTick+1000) ){
-        prevTick = t;
-        //UART_printf( "Hello world (%u)...\r\n", t );
-        //UserLED_toggle();
-        rc = TLY26_ReadWords( 0x200, Data, 2 );
-        UART_printf( "rc=%d, D[0]=%d, D[1]=%d\r\n", (int)rc, Data[0], Data[1] );
+        rc = SIM_Ack();
+        if ( rc ){
+            rc = SIM_CheckSimStatus();
+        }
+
+        /* USER CODE END 2 */
+
+        /* Infinite loop */
+        /* USER CODE BEGIN WHILE */
+        while (1)
+        {
+            /* USER CODE END WHILE */
+            uint32_t t = HAL_GetTick();
+            if ( t >= (prevTick+1000) ){
+                prevTick = t;
+                //UserLED_toggle();
+                rc = TLY26_ReadWords( 0x200, Data, 2 );
+                Temp_NewValues( (int16_t)Data[0], (int16_t)Data[1] );
+                UART_printf( "Tmin=+%d - Tmax=+%d\r\n", (int)Temp_HistoryGetMin(), (int)Temp_HistoryGetMax() );
+            }
+
+        /* USER CODE BEGIN 3 */
+        }
+        (void)rc;
     }
-    /* USER CODE BEGIN 3 */
-  }
-  /* USER CODE END 3 */
+    /* USER CODE END 3 */
 }
-
 /**
   * @brief System Clock Configuration
   * @retval None
@@ -402,10 +414,18 @@ void Error_Handler(void)
   while (1)
   {
       int i;
-      for ( i=0 ; i< 100000 ; i++ )
+      for ( i=0 ; i< 15000 ; i++ ){
         UserLED_on();
-      for ( i=0 ; i< 250000 ; i++ )
+        LED1_on();
+        LED2_on();
+        LED3_on();
+      }
+      for ( i=0 ; i< 25000 ; i++ ){
         UserLED_off();
+        LED1_off();
+        LED2_off();
+        LED3_off();
+      }
   }
   /* USER CODE END Error_Handler_Debug */
 }

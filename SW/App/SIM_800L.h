@@ -17,7 +17,12 @@ extern "C" {
 void SIM_EndOfRx(void);
 void SIM_EndOfTx(void);
 
-void SIM_Init(void);
+bool SIM_Ack(void);
+
+bool SIM_CheckSimStatus(void);
+
+bool SIM_Configure(void);
+
 
 #ifdef __cplusplus
 }

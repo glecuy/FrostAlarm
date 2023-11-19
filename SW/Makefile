@@ -59,7 +59,8 @@ Core/Src/system_stm32f1xx.c
 C_SOURCES += \
 App/TLY26_ModBus.c \
 App/UART_Printf.c \
-App/SIM_800L.c
+App/SIM_800L.c \
+App/Temperature.c
 
 
 # ASM sources
