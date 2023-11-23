@@ -57,6 +57,7 @@ Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_uart.c \
 Core/Src/system_stm32f1xx.c
 
 C_SOURCES += \
+App/UserData.c \
 App/TLY26_ModBus.c \
 App/UART_Printf.c \
 App/SIM_800L.c \
@@ -185,13 +186,13 @@ $(BUILD_DIR):
 	mkdir $@
 
 
+#  stlink-tools deb package
+#  STLINK:		Controller
 #
-#  STLINK:           Controller
-#
-#     2      SWDIO
-#     4      GND
-#     6      SWCLK
-#     8      VCC-3.3
+#     2			SWDIO
+#     4			GND
+#     6			SWCLK
+#     8			VCC-3.3
 #
 flash:
 	st-flash write $(BUILD_DIR)/$(TARGET).bin 0x08000000

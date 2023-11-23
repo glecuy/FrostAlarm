@@ -37,7 +37,7 @@ void DumpFrame( int len ){
  * From https://community.st.com/ forum
  * Differs with bit order and init value !
  */
-unsigned int ModBusCRC16(unsigned char *buf, int len)
+unsigned short ModBusCRC16(unsigned char *buf, int len)
 {
     unsigned int crc = 0xFFFF;
     for (int pos = 0; pos < len; pos++){

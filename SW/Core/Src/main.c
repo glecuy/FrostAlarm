@@ -17,6 +17,8 @@
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
+#include <stdio.h>
+#include <string.h>
 #include "main.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -26,6 +28,7 @@
 #include "UART_Printf.h"
 #include "SIM_800L.h"
 #include "Temperature.h"
+#include "UserData.h"
 
 /* USER CODE END Includes */
 
@@ -49,6 +52,8 @@ TIM_HandleTypeDef htim3;
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
 UART_HandleTypeDef huart3;
+
+UserData_t PermanentData;
 
 /* USER CODE BEGIN PV */
 
@@ -110,18 +115,34 @@ int main(void)
 
         UserLED_off();
 
+        //UserData_Erase();
+
+        rc = UserDataInit( &PermanentData );
+
         TLY26_Init( 0x1 );
 
         Temp_HistoryInit();
 
-        UART_printf( "Hello world ...\r\n");
+        UART_printf( "Hello world ... rc=%d\r\n", rc );
 
+        if ( rc == false ){
+            snprintf( PermanentData.User1, USER_DATA_PHONE_NUMBER_LEN, "0612345678" );
+            UserData_set( &PermanentData );
+        }
 
+#if 0
+        snprintf( PermanentData.User2, USER_DATA_PHONE_NUMBER_LEN, "061122334455" );
+        snprintf( PermanentData.User3, USER_DATA_PHONE_NUMBER_LEN, "060000000000" );
+        snprintf( PermanentData.User4, USER_DATA_PHONE_NUMBER_LEN, "+3369999999999" );
+        UserData_set( &PermanentData );
+#endif
+
+#if 0
         rc = SIM_Ack();
         if ( rc ){
             rc = SIM_CheckSimStatus();
         }
-
+#endif
         /* USER CODE END 2 */
 
         /* Infinite loop */
@@ -130,7 +151,7 @@ int main(void)
         {
             /* USER CODE END WHILE */
             uint32_t t = HAL_GetTick();
-            if ( t >= (prevTick+1000) ){
+            if ( t >= (prevTick+5000) ){
                 prevTick = t;
                 //UserLED_toggle();
                 rc = TLY26_ReadWords( 0x200, Data, 2 );
