@@ -20,6 +20,9 @@
 
 #define TEMP_HISTORY_N_MAX (TEMP_HISTORY_DEPTH_SEC/(TEMP_HISTORY_DEPTH_PTS)/TEMP_TICK)
 
+
+int16_t T1, T2;
+
 struct
 {
     int16_t Values[TEMP_HISTORY_DEPTH_PTS];
@@ -33,7 +36,9 @@ struct
  * N_Max is the number of temp samples used for 1 record
  * ex:
  * For 24 hours history depth:
- * N_Max = (24*3600)/256  1 Sec ssamples
+ * N_Max = (24*3600)/256  1 Sec ssamples (337)
+ * For 36 hours history depth:
+ * N_Max = (36*3600)/256  5 Sec ssamples (101)
  *
 */
 void Temp_HistoryInit( void ){
@@ -130,7 +135,9 @@ int16_t Temp_HighThreshold( int16_t value ){
 void Temp_NewValues( int16_t temp1, int16_t temp2){
 
     Temp_HistoryAddValue( temp1 );
-    UART_printf( "T1=%d, T2=%d\r\n", (int)temp1, (int)temp2 );
+    T1 = temp1;
+    T2 = temp2;
+    //UART_printf( "T1=%d, T2=%d\r\n", (int)temp1, (int)temp2 );
 }
 
 

@@ -92,7 +92,7 @@ static bool TLY26_ReadFrame( uint16_t * pData, uint16_t n ){
     w   = ModBusFrame[n-2]<<0 | ModBusFrame[n-1]<<8;
     //UART_printf( "CRC : %04X/%04X\r\n", w, crc);
     if ( w != crc ){
-        UART_printf( "CRC error: %04X/%04X\r\n", w, crc);
+        UART_printf( "ModBus CRC error: %04X/%04X\r\n", w, crc);
         return false;
     }
 

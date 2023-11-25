@@ -40,6 +40,14 @@ void UART_printf( const char *fmt, ...)
 
 }
 
+void UART_PrintChar( char ch ){
+    if ( uart3TxDone == 0 ){
+        // Wait a while, current message to be sent !
+        HAL_Delay (10);
+    }
+    HAL_UART_Transmit(&huart3, &ch, 1, 10);
+}
+
 
 
 

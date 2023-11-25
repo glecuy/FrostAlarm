@@ -17,7 +17,7 @@ extern "C" {
 void PrintfEndOfTx(void);
 
 void UART_printf( const char *fmt, ...);
-
+void UART_PrintChar( char ch );
 
 #ifdef __cplusplus
 }

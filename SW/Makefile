@@ -58,6 +58,8 @@ Core/Src/system_stm32f1xx.c
 
 C_SOURCES += \
 App/UserData.c \
+App/default_cfg_txt.c \
+App/TextMessage.c \
 App/TLY26_ModBus.c \
 App/UART_Printf.c \
 App/SIM_800L.c \

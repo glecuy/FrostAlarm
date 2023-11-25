@@ -29,6 +29,9 @@
 #include "SIM_800L.h"
 #include "Temperature.h"
 #include "UserData.h"
+#include "TextMessage.h"
+#include "TextMessage.h"
+
 
 /* USER CODE END Includes */
 
@@ -56,6 +59,13 @@ UART_HandleTypeDef huart3;
 UserData_t PermanentData;
 
 /* USER CODE BEGIN PV */
+#define DEBUG 1
+
+#ifdef DEBUG
+  #define MAIN_Debug(...) UART_printf(__VA_ARGS__)
+#else
+  #define MAIN_Debug(...) (void)0
+#endif
 
 /* USER CODE END PV */
 
@@ -110,12 +120,11 @@ int main(void)
   /* USER CODE BEGIN 2 */
     {
         bool rc;
+        int16_t signal;
         uint32_t prevTick=0;
         uint16_t Data[4];
 
         UserLED_off();
-
-        //UserData_Erase();
 
         rc = UserDataInit( &PermanentData );
 
@@ -126,23 +135,41 @@ int main(void)
         UART_printf( "Hello world ... rc=%d\r\n", rc );
 
         if ( rc == false ){
-            snprintf( PermanentData.User1, USER_DATA_PHONE_NUMBER_LEN, "0612345678" );
+            TextDefaultConfig();
             UserData_set( &PermanentData );
         }
-
-#if 0
-        snprintf( PermanentData.User2, USER_DATA_PHONE_NUMBER_LEN, "061122334455" );
-        snprintf( PermanentData.User3, USER_DATA_PHONE_NUMBER_LEN, "060000000000" );
-        snprintf( PermanentData.User4, USER_DATA_PHONE_NUMBER_LEN, "+3369999999999" );
-        UserData_set( &PermanentData );
+#if 1
+        UserDataDump( &PermanentData );
 #endif
 
-#if 0
+#if 1
         rc = SIM_Ack();
         if ( rc ){
+            // Give some time to connect to network
+            LED_ORANGE_on();
+            HAL_Delay(2000);
             rc = SIM_CheckSimStatus();
+            if ( !rc ){
+                LED_RED_on();
+            }
+            LED_ORANGE_off();
+            SIM_ConfigureForText();
+            signal = SIM_ReadSignalQuality();
+            if ( signal > 15 )
+                LED_SIM_OK_on();
+            else if ( signal > 10 )
+                LED_ORANGE_on();
         }
 #endif
+
+
+#if 1
+        rc = TLY26_ReadWords( 0x200, Data, 2 );
+        Temp_NewValues( (int16_t)Data[0], (int16_t)Data[1] );
+        SIM_CheckSMS();
+        //TextSendStatusMessage();
+#endif
+
         /* USER CODE END 2 */
 
         /* Infinite loop */
@@ -156,8 +183,9 @@ int main(void)
                 //UserLED_toggle();
                 rc = TLY26_ReadWords( 0x200, Data, 2 );
                 Temp_NewValues( (int16_t)Data[0], (int16_t)Data[1] );
-                UART_printf( "Tmin=+%d - Tmax=+%d\r\n", (int)Temp_HistoryGetMin(), (int)Temp_HistoryGetMax() );
+                //UART_printf( "Tmin=+%d - Tmax=+%d\r\n", (int)Temp_HistoryGetMin(), (int)Temp_HistoryGetMax() );
             }
+
 
         /* USER CODE BEGIN 3 */
         }
@@ -377,7 +405,9 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : PA1 PA5 PA6 PA7 */
+  /*Configure GPIO pins :   PA1
+   *                        PA5 PA6 PA7
+   *                        PA15 ?? */
   GPIO_InitStruct.Pin = GPIO_PIN_1|GPIO_PIN_5|GPIO_PIN_6|GPIO_PIN_7;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
@@ -437,15 +467,15 @@ void Error_Handler(void)
       int i;
       for ( i=0 ; i< 15000 ; i++ ){
         UserLED_on();
-        LED1_on();
-        LED2_on();
-        LED3_on();
+        LED_RED_on();
+        LED_ORANGE_on();
+        LED_SIM_OK_on();
       }
       for ( i=0 ; i< 25000 ; i++ ){
         UserLED_off();
-        LED1_off();
-        LED2_off();
-        LED3_off();
+        LED_RED_off();
+        LED_ORANGE_off();
+        LED_SIM_OK_off();
       }
   }
   /* USER CODE END Error_Handler_Debug */

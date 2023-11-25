@@ -73,26 +73,33 @@ void Error_Handler(void);
 #define UserLED_off() HAL_GPIO_WritePin (UserLED_GPIO_Port, UserLED_Pin, GPIO_PIN_SET)
 
 
-#define LED1_Pin GPIO_PIN_5
-#define LED1_GPIO_Port GPIOA
+#define SIM800L_Reset_Pin  GPIO_PIN_15
+#define SIM800L_Reset_Port GPIOA
 
-#define LED1_toggle()   HAL_GPIO_TogglePin (LED3_GPIO_Port, LED1_Pin)
-#define LED1_on()       HAL_GPIO_WritePin  (LED3_GPIO_Port, LED1_Pin, GPIO_PIN_SET)
-#define LED1_off()      HAL_GPIO_WritePin  (LED3_GPIO_Port, LED1_Pin, GPIO_PIN_RESET)
+#define LED_RED_toggle()   HAL_GPIO_TogglePin (LED_SIM_OK_GPIO_Port, LED_RED_Pin)
+#define LED_RED_on()       HAL_GPIO_WritePin  (LED_SIM_OK_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET)
+#define LED_RED_off()      HAL_GPIO_WritePin  (LED_SIM_OK_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET)
 
-#define LED2_Pin GPIO_PIN_6
-#define LED2_GPIO_Port GPIOA
+#define LED_RED_Pin GPIO_PIN_5
+#define LED_RED_GPIO_Port GPIOA
 
-#define LED2_toggle()   HAL_GPIO_TogglePin (LED3_GPIO_Port, LED2_Pin)
-#define LED2_on()       HAL_GPIO_WritePin  (LED3_GPIO_Port, LED2_Pin, GPIO_PIN_SET)
-#define LED2_off()      HAL_GPIO_WritePin  (LED3_GPIO_Port, LED2_Pin, GPIO_PIN_RESET)
+#define LED_RED_toggle()   HAL_GPIO_TogglePin (LED_SIM_OK_GPIO_Port, LED_RED_Pin)
+#define LED_RED_on()       HAL_GPIO_WritePin  (LED_SIM_OK_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET)
+#define LED_RED_off()      HAL_GPIO_WritePin  (LED_SIM_OK_GPIO_Port, LED_RED_Pin, GPIO_PIN_RESET)
 
-#define LED3_Pin GPIO_PIN_7
-#define LED3_GPIO_Port GPIOA
+#define LED_ORANGE_Pin GPIO_PIN_6
+#define LED_ORANGE_GPIO_Port GPIOA
 
-#define LED3_toggle()   HAL_GPIO_TogglePin (LED3_GPIO_Port, LED3_Pin)
-#define LED3_on()       HAL_GPIO_WritePin  (LED3_GPIO_Port, LED3_Pin, GPIO_PIN_SET)
-#define LED3_off()      HAL_GPIO_WritePin  (LED3_GPIO_Port, LED3_Pin, GPIO_PIN_RESET)
+#define LED_ORANGE_toggle()   HAL_GPIO_TogglePin (LED_SIM_OK_GPIO_Port, LED_ORANGE_Pin)
+#define LED_ORANGE_on()       HAL_GPIO_WritePin  (LED_SIM_OK_GPIO_Port, LED_ORANGE_Pin, GPIO_PIN_SET)
+#define LED_ORANGE_off()      HAL_GPIO_WritePin  (LED_SIM_OK_GPIO_Port, LED_ORANGE_Pin, GPIO_PIN_RESET)
+
+#define LED_SIM_OK_Pin GPIO_PIN_7
+#define LED_SIM_OK_GPIO_Port GPIOA
+
+#define LED_SIM_OK_toggle()   HAL_GPIO_TogglePin (LED_SIM_OK_GPIO_Port, LED_SIM_OK_Pin)
+#define LED_SIM_OK_on()       HAL_GPIO_WritePin  (LED_SIM_OK_GPIO_Port, LED_SIM_OK_Pin, GPIO_PIN_SET)
+#define LED_SIM_OK_off()      HAL_GPIO_WritePin  (LED_SIM_OK_GPIO_Port, LED_SIM_OK_Pin, GPIO_PIN_RESET)
 
 
 

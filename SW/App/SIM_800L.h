@@ -21,8 +21,18 @@ bool SIM_Ack(void);
 
 bool SIM_CheckSimStatus(void);
 
-bool SIM_Configure(void);
+bool SIM_ConfigureForText(void);
 
+bool SIM_CheckSMS(void);
+
+int16_t SIM_ReadSignalQuality( void );
+int16_t SIM_GetSignalQuality( void );
+
+bool SIM_WriteText( char * text );
+bool SIM_StartMessage( char * phoneNumber );
+bool SIM_WriteEndOfMessage( void );
+
+void SIM_FlushRxComm( char * tag );
 
 #ifdef __cplusplus
 }

@@ -37,6 +37,7 @@ bool UserDataInit( UserData_t *pData );
 bool UserData_get( UserData_t *pData );
 bool UserData_set( UserData_t *pData );
 
+void UserDataDump(UserData_t *pData);
 
 #ifdef __cplusplus
 }

@@ -44,6 +44,7 @@ static bool UserData_Erase(void){
     bool ok=true;
     FLASH_EraseInitTypeDef flashErase;
 
+    UART_printf( "Erasing %X page\r\n", ADDR_FLASH_PAGE);
     /* Fill EraseInit structure*/
     flashErase.TypeErase   = FLASH_TYPEERASE_PAGES;
     flashErase.PageAddress = ADDR_FLASH_PAGE;
@@ -61,7 +62,7 @@ static bool UserData_Erase(void){
     return ok;
 }
 
-static void UserDataDump(UserData_t *pData){
+void UserDataDump(UserData_t *pData){
     if ( pData->User1[0] != 0xFF ){
         UART_printf( "User1=%s\r\n", (char*)pData->User1 );
     }
@@ -171,9 +172,10 @@ bool UserData_set( UserData_t *pData ){
         }
     }
     if ( content_ok  ){
-        USER_DATA_Debug( "Content Ok\r\n" );
+        UART_printf( "Content Ok\r\n" );
         return true;
     }
+    UART_printf( "Updating data at %d\r\n", PositionInPage);
     if ( d_r != 0xFFFF ){
         // Make current position invalid
         HAL_FLASH_Unlock();
