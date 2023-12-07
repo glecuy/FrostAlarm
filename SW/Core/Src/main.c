@@ -153,12 +153,14 @@ int main(void)
                 LED_RED_on();
             }
             LED_ORANGE_off();
-            SIM_ConfigureForText();
             signal = SIM_ReadSignalQuality();
             if ( signal > 15 )
                 LED_SIM_OK_on();
             else if ( signal > 10 )
                 LED_ORANGE_on();
+            SIM_ConfigureForText();
+            // Clear all messages
+            SIM_ClearAll();
         }
 #endif
 
@@ -166,8 +168,8 @@ int main(void)
 #if 1
         rc = TLY26_ReadWords( 0x200, Data, 2 );
         Temp_NewValues( (int16_t)Data[0], (int16_t)Data[1] );
-        SIM_CheckSMS();
-        //TextSendStatusMessage();
+
+        TextSendStatusMessage("Secret");
 #endif
 
         /* USER CODE END 2 */
@@ -180,6 +182,10 @@ int main(void)
             uint32_t t = HAL_GetTick();
             if ( t >= (prevTick+5000) ){
                 prevTick = t;
+
+                SIM_CheckSMS();
+                //SIM_Wait();
+
                 //UserLED_toggle();
                 rc = TLY26_ReadWords( 0x200, Data, 2 );
                 Temp_NewValues( (int16_t)Data[0], (int16_t)Data[1] );
@@ -302,7 +308,6 @@ static void MX_USART1_UART_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN USART1_Init 2 */
-  SIM_EndOfTx();
 
   /* USER CODE END USART1_Init 2 */
 
@@ -422,9 +427,7 @@ static void MX_GPIO_Init(void)
 
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
-    if (huart->Instance == USART1){
-        SIM_EndOfRx();
-    }
+
     if (huart->Instance == USART2){
         TLY26_EndOfRx();
     }
@@ -438,9 +441,6 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
     }
     if ( huart == &huart2 ){
         TLY26_EndOfTx();
-    }
-    if ( huart == &huart1 ){
-        SIM_EndOfTx();
     }
 }
 

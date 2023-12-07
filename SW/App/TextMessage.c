@@ -30,6 +30,7 @@
 
 extern UserData_t PermanentData;
 
+
 char * BuffGetLine( char * line, char * buff ){
     char * ptSrc, * ptDst;
 
@@ -53,13 +54,13 @@ char * BuffGetLine( char * line, char * buff ){
 
 bool GetLineData( char * pData, char * userData ){
 
-        if ( *pData != '+' ){
-            memset( userData, 0xFF, USER_DATA_PHONE_NUMBER_LEN );
-        }
-        else{
-            TEXT_Debug("Un:%s\n", pData );
-            strncpy(userData, pData, USER_DATA_PHONE_NUMBER_LEN);
-        }
+    if ( *pData != '+' ){
+        memset( userData, 0xFF, USER_DATA_PHONE_NUMBER_LEN );
+    }
+    else{
+        TEXT_Debug("Un:%s\n", pData );
+        strncpy(userData, pData, USER_DATA_PHONE_NUMBER_LEN);
+    }
 
     return true;
 }
@@ -124,74 +125,48 @@ bool TextDefaultConfig(void){
 }
 
 
-bool TextSendStatusMessage(void){
+bool TextSendStatusMessage(char * title){
     extern int16_t T1, T2;
-#if 0
+
     UART_printf( "Sending message ! \r\n" );
 
-    //SIM_WriteText("AT+CMGS=\"+33687908087\"\r"); // phone number
-    SIM_StartMessage2( (char*)PermanentData.User1 );
-    //SIM_StartMessage2( "AT+CMGS=\"+33687908087\"\r" ); // User1=+33687908087
-    HAL_Delay(200);
-    SIM_WriteText("Second: hello how are you?\r"); // message
-    HAL_Delay(200);
-    SIM_WriteEndOfMessage();  //send a Ctrl+Z (end of the message)
-
-#else
-
-    char ligne[40];
-    printf( "TextSendStatusMessage\n" );
-    //SIM_StartMessage( (char*)PermanentData.User1 );
-    //SIM_StartMessage( "AT+CMGS=\"+33687908087\"\r" );
-    SIM_WriteText("AT+CMGS=\"+33687908087\"\r"); // phone number
+    SIM_StartMessage( (char*)PermanentData.User1 );
     HAL_Delay(200);
 
-    snprintf(ligne, 40, "T1:%d T2:%d\n", T1, T2 );
-    SIM_WriteText(ligne);
+    SIM_WriteText_f(":%s\n", title);
     HAL_Delay(200);
 
-    SIM_WriteText(":xx\n");
+    SIM_WriteText_f("T1:%d T2:%d\n", T1, T2 );
     HAL_Delay(200);
 
     if ( PermanentData.User1[0] == '+' ){
-        snprintf(ligne, 40, "U1:%s\n", PermanentData.User1 );
-        SIM_WriteText(ligne);
+        SIM_WriteText_f("U1:%s\n", PermanentData.User1 );
         HAL_Delay(200);
     }
     if ( PermanentData.User2[0] == '+' ){
-        snprintf(ligne, 40, "U2:%s\n", PermanentData.User2 );
-        SIM_WriteText(ligne);
+        SIM_WriteText_f("U2:%s\n", PermanentData.User2 );
         HAL_Delay(200);
     }
     if ( PermanentData.User3[0] == '+' ){
-        snprintf(ligne, 40, "U3:%s\n", PermanentData.User3 );
-        SIM_WriteText(ligne);
+        SIM_WriteText_f("U3:%s\n", PermanentData.User3 );
         HAL_Delay(200);
     }
     if ( PermanentData.User4[0] == '+' ){
-        snprintf(ligne, 40, "U4:%s\n", PermanentData.User4 );
-        SIM_WriteText(ligne);
+        SIM_WriteText_f("U4:%s\n", PermanentData.User4 );
         HAL_Delay(200);
     }
 
     //
-    snprintf(ligne, 40, "SH:%+d.%d\n", PermanentData.H_Thresholds/10, abs(PermanentData.H_Thresholds%10) );
-    SIM_WriteText(ligne);
+    SIM_WriteText_f("SH:%+d.%d\n", PermanentData.H_Thresholds/10, abs(PermanentData.H_Thresholds%10) );
     HAL_Delay(200);
 
-    snprintf(ligne, 40, "SB:%+d.%d\n", PermanentData.L_Thresholds/10, abs(PermanentData.L_Thresholds%10) );
-    SIM_WriteText(ligne);
+    SIM_WriteText_f("SB:%+d.%d\n", PermanentData.L_Thresholds/10, abs(PermanentData.L_Thresholds%10) );
     HAL_Delay(200);
 
-    snprintf(ligne, 40, "Q:%+d\n", SIM_GetSignalQuality() );
-    SIM_WriteText(ligne);
+    SIM_WriteText_f("Q:%+d\n", SIM_GetSignalQuality() );
     HAL_Delay(200);
 
     SIM_WriteEndOfMessage();
-#endif
-
-    SIM_FlushRxComm("GMGS");
-
     return true;
 }
 

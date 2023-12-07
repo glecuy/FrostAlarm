@@ -13,52 +13,177 @@
 #include "main.h"
 #include "stm32f1xx_hal.h"
 
+#include <stdarg.h>
+#include <stdio.h>
+
 #include "SIM_800L.h"
 #include "UART_Printf.h"
 
 extern UART_HandleTypeDef huart1;
-volatile uint8_t uart1TxDone;
 
-//uint8_t RxBuffer[32];
-uint8_t RxBuffer[512];
+#define DEBUG 1
+
+#ifdef DEBUG
+  #define SIM_Debug(...) UART_printf(__VA_ARGS__)
+#else
+  #define SIM_Debug(...) (void)0
+#endif
+
+#define SIM_MAIN_LOOP_DELAY  1000
+#define SIM_RX_BUFFER_SIZE (512)
+#define SIM_RX_LINE_SIZE   (256)
+//uint8_t RxLine[32];
+uint8_t RxBuffer[SIM_RX_BUFFER_SIZE];
+uint8_t RxLine[SIM_RX_LINE_SIZE];
+
+#define SIM_TX_BUFFER_SIZE   (40)  // TX via IT
+uint8_t TxBuffer[SIM_TX_BUFFER_SIZE];
 
 uint8_t SignalQuality;
 
-void SIM_EndOfRx(void){
+typedef enum{
+    SIM_OK,
+    SIM_OK_WITH_DATA,
+    SIM_ERROR,
+    SIM_ERROR_WITH_DATA,
+    SIM_TIME_OUT
+}  SIM_resp_e;
+
+
+SIM_resp_e SIM_WaitForData( int timeOut ){
+    uint8_t Rx[2];
+
+    int RxLineLen = 0;
+    uint8_t *pRxBuffer = RxBuffer;
+    HAL_StatusTypeDef rc;
+
+
+    while(1) {
+        rc = HAL_UART_Receive(&huart1, Rx, 1, 2*timeOut);
+        int c = Rx[0];
+        //SIM_Debug( "%02X ", (int)c );
+        if ( rc == HAL_TIMEOUT ) {
+            SIM_Debug( "return Time Out\r\n" );
+            return SIM_TIME_OUT;
+        }
+
+        if ( c == '\r' ){
+            continue;
+        }
+        if ( c == '\n' ) {
+            // End of the line received
+            if (
+                RxLineLen == 2 &&
+                RxLine[0] == 'O' && RxLine[1] == 'K'
+            ) {
+                RxLineLen = 0;
+                int len = (pRxBuffer-RxBuffer);
+                if ( len > 0  ){
+                    RxBuffer[len] = '\0';
+                    SIM_Debug( "OK(%d): \"%s\"\r\n",len, RxBuffer );
+                    return SIM_OK_WITH_DATA;
+                }
+                else{
+                    SIM_Debug( "return OK\r\n" );
+                    return SIM_OK;
+                }
+            }
+            if (
+                RxLineLen == 5 &&
+                RxLine[0] == 'E' && RxLine[1] == 'R' && RxLine[2] == 'R' && RxLine[3] == 'O' && RxLine[4] == 'R'
+            ) {
+                RxLineLen = 0;
+                int len = (pRxBuffer-RxBuffer);
+                if ( len > 0 ){
+                    RxBuffer[len] = '\0';
+                    SIM_Debug( "ERROR(%d): \"%s\"\r\n",len, RxBuffer );
+                    return SIM_ERROR_WITH_DATA;
+                }
+                else{
+                    SIM_Debug( "return ERREUR\r\n" );
+                    return SIM_ERROR;
+                }
+            }
+            if ( RxLineLen > 0 ){;
+                RxLine[RxLineLen] = 0;
+                if ( (pRxBuffer+RxLineLen) < RxBuffer+SIM_RX_BUFFER_SIZE-3){
+                    memcpy( pRxBuffer, RxLine, RxLineLen );
+                    pRxBuffer += RxLineLen;
+                    pRxBuffer[0]='\r';
+                    pRxBuffer[1]='\n';
+                    pRxBuffer += 2;
+                }
+                else{
+                    UART_printf( "Rx Buffer too small!\r\n" );
+                }
+                RxLineLen = 0;
+            }
+        }
+        else{
+            RxLine[RxLineLen] = c;
+            if (RxLineLen < SIM_RX_BUFFER_SIZE)
+                ++RxLineLen;
+        }
+    }
+
+
+    return SIM_OK;
 }
 
-void SIM_EndOfTx(void){
-    uart1TxDone = 1;
+
+
+// Send command or continuation (e.g. SMS text)
+SIM_resp_e SIM_SendCommand( const char* cmd ){
+    HAL_UART_Transmit(&huart1, (uint8_t*)"AT", 2, 100 );
+
+    if (cmd) {
+        SIM_Debug( "CMD = AT%s\r\n", cmd );
+        HAL_UART_Transmit(&huart1, (uint8_t*)cmd, strlen(cmd), 100 );
+    }
+    HAL_UART_Transmit(&huart1, (uint8_t*)"\r", 1, 100 );
+    return SIM_WaitForData(1000);
+}
+
+
+bool SIM_Wait( void ){
+#if 0
+    SIM_WaitForData( SIM_MAIN_LOOP_DELAY );
+#else
+    SIM_SendCommand("I");        //Identification
+#endif
+    // Return true if data available for parsing
+    return true;
 }
 
 
 bool SIM_WriteText( char * text ){
     HAL_StatusTypeDef st;
 
-    for ( int i=0 ; i<strlen(text) ; i++ ){
-        UART_printf( "%02X ", text[i] );
-    }
-    UART_printf( "\r\n");
+    st = HAL_UART_Transmit(&huart1, (uint8_t*)text, strlen(text), 100 );
 
-    if ( uart1TxDone != 0 ){
-        HAL_Delay (10);
-    }
+    return ( st == HAL_OK );
+}
 
-    st = HAL_UART_Transmit_IT(&huart1, (uint8_t*)text, strlen(text) );
+bool SIM_WriteText_f( const char *fmt, ...){
+    va_list ap;
+    HAL_StatusTypeDef st;
+
+    va_start(ap, fmt);
+    vsnprintf( (char*)TxBuffer, SIM_TX_BUFFER_SIZE, fmt, ap);
+    va_end(ap);
+
+    SIM_Debug( "WriteText_f: %s\r\n", (char*)TxBuffer );
+
+    st = HAL_UART_Transmit(&huart1, TxBuffer, strlen((char*)TxBuffer), 100 );
 
     return ( st == HAL_OK );
 }
 
 
 bool SIM_StartMessage( char * phoneNumber ){
-    char ligne[32];
 
-    snprintf(ligne, 32, "AT+CMGS=\"%s\"\r", phoneNumber);
-
-    UART_printf( "\"  %s  \"\r\n", ligne );
-    return SIM_WriteText(ligne);
+    return SIM_WriteText_f("AT+CMGS=\"%s\"\r", phoneNumber);
 }
-
 
 
 bool SIM_WriteEndOfMessage( void ){
@@ -66,19 +191,15 @@ bool SIM_WriteEndOfMessage( void ){
 
     uint8_t eot = 0x1A;
 
-    if ( uart1TxDone != 0 ){
-        HAL_Delay (10);
-    }
-
-    st = HAL_UART_Transmit_IT(&huart1, &eot, 1 );
+    st = HAL_UART_Transmit(&huart1, &eot, 1, 100 );
 
     return ( st == HAL_OK );
 }
 
 
 void SIM_FlushRxComm( char * tag ){
-    HAL_UART_Receive(&huart1, RxBuffer, 32, 200);
-    UART_printf( "%s: %s\r", tag, RxBuffer );
+    HAL_UART_Receive(&huart1, RxLine, 32, 200);
+    UART_printf( "%s: %s\r", tag, RxLine );
 }
 
 
@@ -134,10 +255,9 @@ int16_t SIM_ReadSignalQuality( void ){
     // Parse +CSQ: 27,0
     int16_t value = -1;
 
-    SIM_WriteText("AT+CSQ\n");    //Signal quality
-    RxBuffer[0] = '\0';
-    HAL_UART_Receive(&huart1, RxBuffer, 32, 100);
+    SIM_SendCommand("+CSQ");    //Signal quality
 
+    // TODO
     char * ptr = strstr((char*)RxBuffer, "CSQ:" );
     if ( ptr != NULL ){
         ptr += 4;
@@ -154,113 +274,110 @@ int16_t SIM_GetSignalQuality( void ){
     return (int16_t)SignalQuality;
 }
 
+/****
 
+ATI
+AT+CPIN?
+AT+CPIN="1234"
+AT
+AT+CSQ
+
+AT+CSCS="GSM"
+AT+CMGF=1
+AT+CNMI=1,2,0,0,0
+AT+CMGDA="DEL ALL"
+AT&W
+
+
+AT+CMGL="ALL"
+******************************/
 bool SIM_Ack(void){
-    HAL_StatusTypeDef st;
-
+    SIM_resp_e r;
     LED_SIM_OK_on();
 
     // HW reset ??
+    UART_printf( "Configuring SIM card ...\r\n" );
 
-    SIM_WriteText("ATE0\n");        //Disable echo
-    HAL_UART_Receive(&huart1, RxBuffer, 32, 50);  // Wait 50 mSec
-    SIM_WriteText("ATI\n");          //Identification
-    RxBuffer[0] = '\0';
-    HAL_UART_Receive(&huart1, RxBuffer, 32, 50);
-    RxBuffer[14] = '\0';
-    UART_printf( "SIM800L release %s\r\n", RxBuffer );
+    SIM_SendCommand("E0");       //Disable echo
+    SIM_SendCommand("I");        //Identification
 
     HAL_Delay(500);
-    SIM_WriteText("AT+CPIN?\n");
-    RxBuffer[0] = '\0';
-    HAL_UART_Receive(&huart1, RxBuffer, 32, 50);
-    UART_printf( "CPIN?: %s\r", RxBuffer );
+    r = SIM_SendCommand("+CPIN?");
 
     // TODO test response READY or NOT READY ? (+CPIN: READY)
-    if ( SIM_IsReady( (char*)RxBuffer ) ){
+    if ( SIM_IsReady( (char*)RxLine) ){
         UART_printf( "SIM Ready\r\n" );
     }
     else{
         UART_printf( "Setting PIN code\r\n" );
-        SIM_WriteText("AT+CPIN=\"1234\"\n");
-        RxBuffer[0] = '\0';
-        HAL_UART_Receive(&huart1, RxBuffer, 32, 200);
-        UART_printf( "CPIN: %s\r", RxBuffer );
+        SIM_SendCommand("+CPIN=\"1234\"");
     }
 
     HAL_Delay(500);
-    // Try to flush RX
-    HAL_UART_Receive(&huart1, RxBuffer, 32, 100);
 
-    SIM_WriteText("AT\r\n");          //ACK command
-    // Check response ("OK")
-    st = HAL_UART_Receive(&huart1, RxBuffer, 32, 50);
-    //UART_printf( "Resp=%02X %02X %02X %02X\r\n", RxBuffer[0], RxBuffer[1], RxBuffer[2], RxBuffer[3] );
+    r = SIM_SendCommand(""); // ACK command
 
     LED_SIM_OK_off();
 
-    if ( RxBuffer[2]=='O' && RxBuffer[3]=='K' ){
+    if ( r == SIM_OK ){
         return true;
     }
-    // else
-    UART_printf( "SIM800L not OK: %s (%d)\r\n", RxBuffer, st );
     return false;
 }
 
 
-bool SIM_ConfigureForText(void){
-    SIM_WriteText("AT+CSCS=\"GSM\"\n"); // GSM 7 bit default alphabet
-    HAL_Delay(100);
-    SIM_WriteText("AT+CMGF=1\n");       // Message in format text
-    HAL_Delay(500);
-
-#if 0
-    UART_printf( "Sending message ! \r\n" );
-
-    SIM_WriteText("AT+CMGS=\"+33687908087\"\r"); // phone number
-    HAL_Delay(200);
-    SIM_WriteText("Hello how are you?\r"); // message
-    HAL_Delay(200);
-    SIM_WriteEndOfMessage();  //send a Ctrl+Z (end of the message)
-
-    HAL_UART_Receive(&huart1, RxBuffer, 32, 200);
-    UART_printf( "GMGS: %s\r", RxBuffer );
-#endif
-
-    return true;
-}
-
 
 bool SIM_CheckSimStatus(void){
     HAL_Delay(500);
-    SIM_WriteText("AT+CCID\n");   //Read SIM information to confirm whether the SIM is plugged
-    RxBuffer[0] = '\0';
-    HAL_UART_Receive(&huart1, RxBuffer, 32, 50);
-    UART_printf( "CCID: %s\r", RxBuffer );
+    SIM_SendCommand("+CCID");   //Read SIM information to confirm whether the SIM is plugged
+    UART_printf( "SIM ID: %s\r\n", RxLine );
     HAL_Delay(100);
 
-    SIM_WriteText("AT+CREG=?\n");  //Check whether it has registered in the network
-    RxBuffer[0] = '\0';
-    HAL_UART_Receive(&huart1, RxBuffer, 32, 50);
-    UART_printf( "CREG=?: %s\r", RxBuffer );
+    SIM_SendCommand("+CREG=?");  //Check whether it has registered in the network
     HAL_Delay(100);
 
-    SIM_WriteText("AT+CSQ\n");    //Signal quality test, value range is 0-31 , 31 is the best
-    RxBuffer[0] = '\0';
-    HAL_UART_Receive(&huart1, RxBuffer, 32, 50);
-    UART_printf( "CSQ: %s\r", RxBuffer );
-    HAL_Delay(100);
-
-    SIM_WriteText("AT+COPS ?\n");
-    RxBuffer[0] = '\0';
-    HAL_UART_Receive(&huart1, RxBuffer, 32, 50);
-    UART_printf( "COPS: %s\r", RxBuffer );
+    SIM_SendCommand("+COPS ?");
+    UART_printf( "SIM OPS: %s\r\n", RxLine );
     HAL_Delay(100);
 
     // TODO test quality, operator list, ...
 
     return true;
 }
+
+
+
+void SIM_ClearAll( void ){
+    //delete all sms
+    SIM_SendCommand("+CMGD=1,4");
+    HAL_Delay(1000);
+    SIM_SendCommand("+CMGDA= \"DEL ALL\"");
+    HAL_Delay(1000);
+}
+
+
+bool SIM_ConfigureForText(void){
+
+    // GSM 7 bit default alphabet
+    SIM_SendCommand("+CSCS=\"GSM\"");
+    HAL_Delay(100);
+    // Message in format text
+    SIM_SendCommand("+CMGF=1");
+    HAL_Delay(100);
+
+    // Route SMS to serial
+    //SIM_SendCommand("+CNMI=1,2,0,0,0");
+    // Do not route SMS to serial, (No SMS-DELIVER notification)
+    SIM_SendCommand("+CNMI=0,0,0,0,0");
+    HAL_Delay(100);
+
+    //// Save configuration
+    //SIM_SendCommand("&W");
+    //HAL_Delay(100);
+
+    return true;
+}
+
 
 /*
 AT+CMGL= "REC UNREAD"       +CMGL : , "REC UNREAD","<n° de tél>,"",     Affiche tous les SMS non lus
@@ -278,18 +395,15 @@ at which point no further SMS can be received.
 This buffer can simply be cleared by executing the command at+cmgda="DEL ALL"
 ******************************************************************************************************************/
 bool SIM_CheckSMS(void){
-    uint16_t RxLen;
-    SIM_WriteText("AT+CMGL=\"ALL\"\n");   //Read SIM information to confirm whether the SIM is plugged
-    RxBuffer[0] = '\0';
-    HAL_UARTEx_ReceiveToIdle(&huart1, RxBuffer, 512, &RxLen, 100);
-    UART_printf( "RxLen=%d\r\n", RxLen );
-    UART_printf( "CMGL1: %s\r\n", RxBuffer );
-    HAL_UARTEx_ReceiveToIdle(&huart1, RxBuffer, 512, &RxLen, 100);
-    UART_printf( "RxLen=%d\r\n", RxLen );
-    UART_printf( "CMGL2: %s\r\n", RxBuffer );
-    HAL_UARTEx_ReceiveToIdle(&huart1, RxBuffer, 512, &RxLen, 100);
-    UART_printf( "RxLen=%d\r\n", RxLen );
-    UART_printf( "CMGL3: %s\r\n", RxBuffer );
+    if ( SIM_OK_WITH_DATA == SIM_SendCommand("+CMGL=\"ALL\"") ){
+        UART_printf( "Message: %s\r\n", RxBuffer );
+        // Process message
 
-    return true;
+        // Delete message
+        //SIM_ClearAll();
+        return true;
+    }
+    else{
+        return false;
+    }
 }

@@ -11,7 +11,7 @@ extern DMA_HandleTypeDef hdma_usart3_tx;
 
 void UART_printf( const char *fmt, ...);
 
-#define UART3_TX_BUFF_LEN (80)
+#define UART3_TX_BUFF_LEN (256)
 // Send text up to 80 chars at once
 uint8_t uart3TxBuffer[UART3_TX_BUFF_LEN];
 
@@ -22,8 +22,7 @@ void PrintfEndOfTx(void){
     uart3TxDone = 1;
 }
 
-void UART_printf( const char *fmt, ...)
-{
+void UART_printf( const char *fmt, ...){
     va_list ap;
 
     if ( uart3TxDone == 0 ){
@@ -45,7 +44,7 @@ void UART_PrintChar( char ch ){
         // Wait a while, current message to be sent !
         HAL_Delay (10);
     }
-    HAL_UART_Transmit(&huart3, &ch, 1, 10);
+    HAL_UART_Transmit(&huart3, (uint8_t *)&ch, 1, 10);
 }
 
 

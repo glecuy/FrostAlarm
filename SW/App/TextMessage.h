@@ -15,7 +15,7 @@ extern "C" {
 #endif
 
 bool TextDefaultConfig(void);
-bool TextSendStatusMessage(void);
+bool TextSendStatusMessage(char * title);
 
 #ifdef __cplusplus
 }
