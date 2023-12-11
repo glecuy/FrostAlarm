@@ -1,4 +1,6 @@
 /* App/SIM_800L.h
+ * Header for SIM_A7670 as well
+ *
  * Reference:
 
  TLY25/26/27/28/29/35 Communication protocol User’s manual (Tecnologic S.p.A.)
@@ -26,6 +28,7 @@ bool SIM_CheckSimStatus(void);
 bool SIM_ConfigureForText(void);
 
 bool SIM_CheckSMS(void);
+bool SIM_ProcessSMS(void);
 
 bool SIM_Wait( void );
 

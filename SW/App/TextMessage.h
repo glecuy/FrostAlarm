@@ -17,6 +17,8 @@ extern "C" {
 bool TextDefaultConfig(void);
 bool TextSendStatusMessage(char * title);
 
+bool TextIncomingMessageProcess(char * pMess);
+
 #ifdef __cplusplus
 }
 #endif

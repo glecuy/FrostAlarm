@@ -30,7 +30,7 @@
 #include "Temperature.h"
 #include "UserData.h"
 #include "TextMessage.h"
-#include "TextMessage.h"
+
 
 
 /* USER CODE END Includes */
@@ -160,7 +160,7 @@ int main(void)
                 LED_ORANGE_on();
             SIM_ConfigureForText();
             // Clear all messages
-            SIM_ClearAll();
+            //SIM_ClearAll();
         }
 #endif
 
@@ -169,7 +169,7 @@ int main(void)
         rc = TLY26_ReadWords( 0x200, Data, 2 );
         Temp_NewValues( (int16_t)Data[0], (int16_t)Data[1] );
 
-        TextSendStatusMessage("Secret");
+        //TextSendStatusMessage("Initial");
 #endif
 
         /* USER CODE END 2 */
@@ -183,7 +183,16 @@ int main(void)
             if ( t >= (prevTick+5000) ){
                 prevTick = t;
 
-                SIM_CheckSMS();
+                rc = SIM_CheckSMS();
+
+                if ( rc ){
+                    // Process message
+                    SIM_ProcessSMS();
+
+                    // Delete message
+                    //SIM_ClearAll();
+                }
+
                 //SIM_Wait();
 
                 //UserLED_toggle();

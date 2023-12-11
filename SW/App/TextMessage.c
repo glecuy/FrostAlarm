@@ -14,13 +14,17 @@
 
 #include "UserData.h"
 #include "SIM_800L.h"
+#include "Temperature.h"
 
 #include "UART_Printf.h"
 
-#define SECRET ":Secret"
-#define LINE_MAX_LEN 32
+#define KEY_SECRET ":Secret"
 
-//#define DEBUG 1
+#define KEY_STATUS ":Statut"
+
+#define LINE_MAX_LEN 40  // Large enough to get phone number
+
+#define DEBUG 1
 
 #ifdef DEBUG
   #define TEXT_Debug(...) UART_printf(__VA_ARGS__)
@@ -28,7 +32,23 @@
   #define TEXT_Debug(...) (void)0
 #endif
 
+typedef enum{
+    TEXT_CONFIG,
+    TEXT_STATUS,
+    TEXT_ACK,
+    TEXT_RESTART,
+    TEXT_OK,
+    TEXT_ERROR,
+}  TEXT_ID_e;
+
+
 extern UserData_t PermanentData;
+
+char SenderAddr[16];
+
+// Last message time stamp
+uint32_t LastMessageTS;
+#define MIN_MESSAGE_INTERVAL (5*60)    // 5 minutes
 
 
 char * BuffGetLine( char * line, char * buff ){
@@ -37,14 +57,18 @@ char * BuffGetLine( char * line, char * buff ){
     ptSrc = buff;
     ptDst = line;
     while( *ptSrc != '\n' ){
-        *ptDst = *ptSrc;
+        if ( *ptSrc == '\r' ){
+            ptSrc++;
+            continue;
+        }
+        if ( ptDst < (line+LINE_MAX_LEN-1) ){
+            *ptDst = *ptSrc;
+            ptDst++;
+        }
         if ( *ptSrc == '\0' ){
             return NULL;
         }
-        ptDst++;
         ptSrc++;
-        if ( ptDst >= (line+LINE_MAX_LEN-1) )
-            break;
     }
     *ptDst = '\0';
 
@@ -97,47 +121,119 @@ bool ReadLineParam( char * line, UserData_t * userData ){
 }
 
 
-bool TextMessageParse( char * text, UserData_t * userData ){
+TEXT_ID_e TextMessageParse( char * text, UserData_t * userData ){
     char line[LINE_MAX_LEN];
     char * ptText = text;
     ptText = BuffGetLine( line, ptText );
-    TEXT_Debug("%s\r\n", line );
+    TEXT_Debug("(%d)%s\n", (int)strlen(line), line );
 
-    if ( strcmp (line, SECRET) != 0 ){
-        UART_printf( "Wrong secret. text rejected.\r\n");
+    if ( strcmp (line, KEY_SECRET) != 0 ){
+        UART_printf( "Wrong secret(%s). text rejected.\r\n", line);
+    }
+
+    ptText = BuffGetLine( line, ptText );
+    TEXT_Debug("%s\r\n", line );
+    if ( strcasecmp (line, KEY_STATUS) == 0 ){
+        // Status requested
+        return TEXT_STATUS;
     }
 
     while (ptText != NULL ){
         ptText = BuffGetLine( line, ptText );
-        //TEXT_Debug("%s\n", line );
+        TEXT_Debug("(%d)%s\n", (int)strlen(line), line );
         ReadLineParam( line, userData );
     }
 
-    return true;
+    return TEXT_OK;
 }
+
+
+char * TextMessageHeaderParse( char * text ){
+    char line[LINE_MAX_LEN];
+    char * ptText = text;
+    ptText = BuffGetLine( line, ptText );
+    TEXT_Debug("Header:(%d)%s\n", (int)strlen(line), line );
+
+    // Must contain at least 4 '"' characters
+    char c, *pdst, *ptr = line;
+    int token=0;
+    while( (c = *ptr) != '\0' ){
+        if ( c== '"' ){
+            token++;
+        }
+        ptr++;
+    }
+    if ( token >= 4 ){
+        ptr = line;
+        token=0;
+
+        while( token<3 ){
+            if ( *ptr== '"' ){
+                token++;
+            }
+            ptr++;
+        }
+        pdst = SenderAddr;
+        while ( *ptr!= '"' ){
+            *pdst++ = *ptr++;
+            if ( (pdst - SenderAddr) >= 16-1 ){
+                break;
+            }
+        }
+        *pdst = '\0';
+    }
+
+    TEXT_Debug("SenderAddr = %s\n", SenderAddr );
+
+    return ptText;
+}
+
 
 bool TextDefaultConfig(void){
     extern unsigned default_cfg_txt_size(void);
     extern const unsigned char default_cfg_txt[];
     TEXT_Debug( "Size of config: %d\r\n", default_cfg_txt_size() );
     memset( &PermanentData, 0xFF, sizeof(UserData_t) );
-    return TextMessageParse( (char*)default_cfg_txt, &PermanentData );
+    return (TEXT_ERROR != TextMessageParse( (char*)default_cfg_txt, &PermanentData ) );
 }
 
 
-bool TextSendStatusMessage(char * title){
+char * formatTemp( int16_t t, char sT[8] ){
+
+    snprintf(sT, 8, "%d.%d", t/10, abs(t%10) );
+    return sT;
+}
+
+bool TextSendStatusMessage(char *pDest, char * title){
     extern int16_t T1, T2;
+    char sA[8], sB[8];
+    bool isConfig;
+
+    uint32_t ts = HAL_GetTick()/1000;
+
+    if ( ts < (LastMessageTS + MIN_MESSAGE_INTERVAL) ){
+        UART_printf( "Message not sent (%u/%u)!\r\n", ts, LastMessageTS );
+        return false;
+    }
 
     UART_printf( "Sending message ! \r\n" );
 
-    SIM_StartMessage( (char*)PermanentData.User1 );
+    isConfig = ( strcmp(title, "Statut") != 0 );
+
+    SIM_StartMessage( pDest );
     HAL_Delay(200);
 
     SIM_WriteText_f(":%s\n", title);
     HAL_Delay(200);
 
-    SIM_WriteText_f("T1:%d T2:%d\n", T1, T2 );
-    HAL_Delay(200);
+    if ( ! isConfig ){
+        //SIM_WriteText_f("T1:%d T2:%d\n", T1, T2 );
+        SIM_WriteText_f("T1=%s T2=%s\n", formatTemp(T1, sA), formatTemp(T2, sB) );
+        HAL_Delay(100);
+
+        SIM_WriteText_f("Min=%s Max=%s\n", formatTemp(Temp_HistoryGetMin(), sA), formatTemp(Temp_HistoryGetMax(), sB) );
+        HAL_Delay(100);
+    }
 
     if ( PermanentData.User1[0] == '+' ){
         SIM_WriteText_f("U1:%s\n", PermanentData.User1 );
@@ -157,17 +253,52 @@ bool TextSendStatusMessage(char * title){
     }
 
     //
-    SIM_WriteText_f("SH:%+d.%d\n", PermanentData.H_Thresholds/10, abs(PermanentData.H_Thresholds%10) );
+    SIM_WriteText_f("SH:%s\n", formatTemp(PermanentData.H_Thresholds, sA) );
     HAL_Delay(200);
 
-    SIM_WriteText_f("SB:%+d.%d\n", PermanentData.L_Thresholds/10, abs(PermanentData.L_Thresholds%10) );
+    SIM_WriteText_f("SB:%s\n", formatTemp(PermanentData.L_Thresholds, sA) );
     HAL_Delay(200);
 
-    SIM_WriteText_f("Q:%+d\n", SIM_GetSignalQuality() );
+    if ( ! isConfig ){
+        SIM_WriteText_f("Q:%+d\n", 25 );
+        HAL_Delay(200);
+    }
+
+    // Current time stamp
+    SIM_WriteText_f("TS:%07u\n", ts );
     HAL_Delay(200);
 
     SIM_WriteEndOfMessage();
+
+    LastMessageTS = ts;
     return true;
 }
 
+
+bool TextIncomingMessageProcess(char * pMess){
+    char * ptText = pMess;
+    TEXT_ID_e rc;
+
+    ptText = TextMessageHeaderParse( ptText );
+
+    TEXT_Debug( "\n\nMessage from %s :\r\n", SenderAddr );
+
+    rc = TextMessageParse( ptText, &PermanentData );
+
+    if ( rc == TEXT_STATUS ){
+        TEXT_Debug( "Status requested\r\n" );
+        TextSendStatusMessage( SenderAddr, "Status");
+        return true;
+    }
+
+    if ( rc == TEXT_ERROR ){
+        TEXT_Debug( "Text parsing error !\r\n" );
+        return false;
+    }
+
+    TEXT_Debug( "New config required\r\n" );
+    TextSendStatusMessage( SenderAddr, "Config");
+
+    return true;
+}
 

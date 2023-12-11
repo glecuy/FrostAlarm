@@ -1,5 +1,5 @@
 /* SIM_800L.c
- * Reference:
+ * Reference: SIM800_Series_AT_Command_Manual_V1.10_0.pdf
 
 
     SIM800Lconnected to UART1
@@ -18,10 +18,12 @@
 
 #include "SIM_800L.h"
 #include "UART_Printf.h"
+#include "TextMessage.h"
+
 
 extern UART_HandleTypeDef huart1;
 
-#define DEBUG 1
+//#define DEBUG 1
 
 #ifdef DEBUG
   #define SIM_Debug(...) UART_printf(__VA_ARGS__)
@@ -32,12 +34,12 @@ extern UART_HandleTypeDef huart1;
 #define SIM_MAIN_LOOP_DELAY  1000
 #define SIM_RX_BUFFER_SIZE (512)
 #define SIM_RX_LINE_SIZE   (256)
-//uint8_t RxLine[32];
-uint8_t RxBuffer[SIM_RX_BUFFER_SIZE];
-uint8_t RxLine[SIM_RX_LINE_SIZE];
+//uint8_t SimRxLine[32];
+uint8_t SimRxBuffer[SIM_RX_BUFFER_SIZE];
+uint8_t SimRxLine[SIM_RX_LINE_SIZE];
 
-#define SIM_TX_BUFFER_SIZE   (40)  // TX via IT
-uint8_t TxBuffer[SIM_TX_BUFFER_SIZE];
+#define SIM_TX_BUFFER_SIZE   (64)
+uint8_t SimTxBuffer[SIM_TX_BUFFER_SIZE];
 
 uint8_t SignalQuality;
 
@@ -54,12 +56,12 @@ SIM_resp_e SIM_WaitForData( int timeOut ){
     uint8_t Rx[2];
 
     int RxLineLen = 0;
-    uint8_t *pRxBuffer = RxBuffer;
+    uint8_t *pRxBuffer = SimRxBuffer;
     HAL_StatusTypeDef rc;
 
 
     while(1) {
-        rc = HAL_UART_Receive(&huart1, Rx, 1, 2*timeOut);
+        rc = HAL_UART_Receive(&huart1, Rx, 1, timeOut);
         int c = Rx[0];
         //SIM_Debug( "%02X ", (int)c );
         if ( rc == HAL_TIMEOUT ) {
@@ -74,13 +76,12 @@ SIM_resp_e SIM_WaitForData( int timeOut ){
             // End of the line received
             if (
                 RxLineLen == 2 &&
-                RxLine[0] == 'O' && RxLine[1] == 'K'
+                SimRxLine[0] == 'O' && SimRxLine[1] == 'K'
             ) {
-                RxLineLen = 0;
-                int len = (pRxBuffer-RxBuffer);
+                int len = (pRxBuffer-SimRxBuffer) - 2; // crlf removed
                 if ( len > 0  ){
-                    RxBuffer[len] = '\0';
-                    SIM_Debug( "OK(%d): \"%s\"\r\n",len, RxBuffer );
+                    SimRxBuffer[len] = '\0';
+                    SIM_Debug( "OK(%d): \"%s\"\r\n",len, SimRxBuffer );
                     return SIM_OK_WITH_DATA;
                 }
                 else{
@@ -90,13 +91,12 @@ SIM_resp_e SIM_WaitForData( int timeOut ){
             }
             if (
                 RxLineLen == 5 &&
-                RxLine[0] == 'E' && RxLine[1] == 'R' && RxLine[2] == 'R' && RxLine[3] == 'O' && RxLine[4] == 'R'
+                SimRxLine[0] == 'E' && SimRxLine[1] == 'R' && SimRxLine[2] == 'R' && SimRxLine[3] == 'O' && SimRxLine[4] == 'R'
             ) {
-                RxLineLen = 0;
-                int len = (pRxBuffer-RxBuffer);
+                int len = (pRxBuffer-SimRxBuffer);
                 if ( len > 0 ){
-                    RxBuffer[len] = '\0';
-                    SIM_Debug( "ERROR(%d): \"%s\"\r\n",len, RxBuffer );
+                    SimRxBuffer[len] = '\0';
+                    SIM_Debug( "ERROR(%d): \"%s\"\r\n",len, SimRxBuffer );
                     return SIM_ERROR_WITH_DATA;
                 }
                 else{
@@ -105,9 +105,9 @@ SIM_resp_e SIM_WaitForData( int timeOut ){
                 }
             }
             if ( RxLineLen > 0 ){;
-                RxLine[RxLineLen] = 0;
-                if ( (pRxBuffer+RxLineLen) < RxBuffer+SIM_RX_BUFFER_SIZE-3){
-                    memcpy( pRxBuffer, RxLine, RxLineLen );
+                SimRxLine[RxLineLen] = 0;
+                if ( (pRxBuffer+RxLineLen) < SimRxBuffer+SIM_RX_BUFFER_SIZE-3){
+                    memcpy( pRxBuffer, SimRxLine, RxLineLen );
                     pRxBuffer += RxLineLen;
                     pRxBuffer[0]='\r';
                     pRxBuffer[1]='\n';
@@ -120,7 +120,7 @@ SIM_resp_e SIM_WaitForData( int timeOut ){
             }
         }
         else{
-            RxLine[RxLineLen] = c;
+            SimRxLine[RxLineLen] = c;
             if (RxLineLen < SIM_RX_BUFFER_SIZE)
                 ++RxLineLen;
         }
@@ -141,7 +141,7 @@ SIM_resp_e SIM_SendCommand( const char* cmd ){
         HAL_UART_Transmit(&huart1, (uint8_t*)cmd, strlen(cmd), 100 );
     }
     HAL_UART_Transmit(&huart1, (uint8_t*)"\r", 1, 100 );
-    return SIM_WaitForData(1000);
+    return SIM_WaitForData(SIM_MAIN_LOOP_DELAY);
 }
 
 
@@ -169,12 +169,12 @@ bool SIM_WriteText_f( const char *fmt, ...){
     HAL_StatusTypeDef st;
 
     va_start(ap, fmt);
-    vsnprintf( (char*)TxBuffer, SIM_TX_BUFFER_SIZE, fmt, ap);
+    vsnprintf( (char*)SimTxBuffer, SIM_TX_BUFFER_SIZE, fmt, ap);
     va_end(ap);
 
-    SIM_Debug( "WriteText_f: %s\r\n", (char*)TxBuffer );
+    SIM_Debug( "WriteText_f: %s\r\n", (char*)SimTxBuffer );
 
-    st = HAL_UART_Transmit(&huart1, TxBuffer, strlen((char*)TxBuffer), 100 );
+    st = HAL_UART_Transmit(&huart1, SimTxBuffer, strlen((char*)SimTxBuffer), 100 );
 
     return ( st == HAL_OK );
 }
@@ -198,8 +198,8 @@ bool SIM_WriteEndOfMessage( void ){
 
 
 void SIM_FlushRxComm( char * tag ){
-    HAL_UART_Receive(&huart1, RxLine, 32, 200);
-    UART_printf( "%s: %s\r", tag, RxLine );
+    HAL_UART_Receive(&huart1, SimRxLine, 32, 200);
+    UART_printf( "%s: %s\r", tag, SimRxLine );
 }
 
 
@@ -258,7 +258,7 @@ int16_t SIM_ReadSignalQuality( void ){
     SIM_SendCommand("+CSQ");    //Signal quality
 
     // TODO
-    char * ptr = strstr((char*)RxBuffer, "CSQ:" );
+    char * ptr = strstr((char*)SimRxBuffer, "CSQ:" );
     if ( ptr != NULL ){
         ptr += 4;
         value = atoi(ptr);
@@ -305,7 +305,7 @@ bool SIM_Ack(void){
     r = SIM_SendCommand("+CPIN?");
 
     // TODO test response READY or NOT READY ? (+CPIN: READY)
-    if ( SIM_IsReady( (char*)RxLine) ){
+    if ( SIM_IsReady( (char*)SimRxLine) ){
         UART_printf( "SIM Ready\r\n" );
     }
     else{
@@ -330,14 +330,14 @@ bool SIM_Ack(void){
 bool SIM_CheckSimStatus(void){
     HAL_Delay(500);
     SIM_SendCommand("+CCID");   //Read SIM information to confirm whether the SIM is plugged
-    UART_printf( "SIM ID: %s\r\n", RxLine );
+    UART_printf( "SIM ID: %s\r\n", SimRxLine );
     HAL_Delay(100);
 
     SIM_SendCommand("+CREG=?");  //Check whether it has registered in the network
     HAL_Delay(100);
 
     SIM_SendCommand("+COPS ?");
-    UART_printf( "SIM OPS: %s\r\n", RxLine );
+    UART_printf( "SIM OPS: %s\r\n", SimRxLine );
     HAL_Delay(100);
 
     // TODO test quality, operator list, ...
@@ -396,14 +396,19 @@ This buffer can simply be cleared by executing the command at+cmgda="DEL ALL"
 ******************************************************************************************************************/
 bool SIM_CheckSMS(void){
     if ( SIM_OK_WITH_DATA == SIM_SendCommand("+CMGL=\"ALL\"") ){
-        UART_printf( "Message: %s\r\n", RxBuffer );
-        // Process message
+        UART_printf( "Message: %s\r\n", SimRxBuffer );
 
-        // Delete message
-        //SIM_ClearAll();
+
         return true;
     }
     else{
         return false;
     }
 }
+
+
+bool SIM_ProcessSMS(void){
+    return TextIncomingMessageProcess((char *)SimRxBuffer);
+}
+
+
