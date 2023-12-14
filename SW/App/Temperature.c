@@ -6,11 +6,15 @@
  */
 
 /* Includes ------------------------------------------------------------------*/
+#include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include "main.h"
 #include "stm32f1xx_hal.h"
 
+#include "UserData.h"
 #include "SIM_800L.h"
+#include "Temperature.h"
 #include "UART_Printf.h"
 
 #define TEMP_16_UNDEF INT16_MIN
@@ -20,8 +24,12 @@
 
 #define TEMP_HISTORY_N_MAX (TEMP_HISTORY_DEPTH_SEC/(TEMP_HISTORY_DEPTH_PTS)/TEMP_TICK)
 
-
 int16_t T1, T2;
+
+uint16_t TempLow, TempHigh;
+
+
+extern UserData_t PermanentData;
 
 struct
 {
@@ -51,6 +59,9 @@ void Temp_HistoryInit( void ){
     TempHistory.Index = 0;
     TempHistory.N = 0;
     TempHistory.Acc = 0;
+
+    TempLow  = 0;
+    TempHigh = 0;
 }
 
 /* Add value to history
@@ -117,18 +128,26 @@ int16_t Temp_HistoryGetMin( void )
         return min;
 }
 
+// Format temp value from tenth of degree to fixed point string
+// 172  ==> "17.2"
+// str MUST be 8 char long !
+char * formatTemp( int16_t t, char * str ){
 
-
-int16_t Temp_LowThreshold( int16_t value ){
-
-    return value;
+    snprintf(str, 8, "%d.%d", t/10, abs(t%10) );
+    return str;
 }
 
 
-int16_t Temp_HighThreshold( int16_t value ){
-
-    return value;
+int16_t Temp_GetT1( void )
+{
+    return T1;
 }
+
+int16_t Temp_GetT2( void )
+{
+    return T2;
+}
+
 
 
 
@@ -140,7 +159,30 @@ void Temp_NewValues( int16_t temp1, int16_t temp2){
     //UART_printf( "T1=%d, T2=%d\r\n", (int)temp1, (int)temp2 );
 }
 
+/*
+ * Test T1 temperature against defined thresholds
+ * 3 in a raw shall trig an alarm
+ ***************************************************/
+TEMP_TH_e Temp_AlarmsCheck( void ){
 
-bool Temp_AlarmsCheck( void ){
-    return false;
+    if( T1 < PermanentData.L_Thresholds ){
+        TempLow++;
+    } else {
+        TempLow = 0;
+    }
+    if( T1 > PermanentData.H_Thresholds ){
+        TempHigh++;
+    } else {
+        TempHigh = 0;
+    }
+
+    if ( TempHigh >= 3 ){
+        return TEMP_HIGH;
+    }
+    else if ( TempLow >= 3 ){
+        return TEMP_LOW;
+    }
+    else{
+        return TEMP_NORMAL;
+    }
 }

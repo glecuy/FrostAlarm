@@ -24,7 +24,7 @@
 
 #define LINE_MAX_LEN 40  // Large enough to get phone number
 
-#define DEBUG 1
+//#define DEBUG 1
 
 #ifdef DEBUG
   #define TEXT_Debug(...) UART_printf(__VA_ARGS__)
@@ -38,6 +38,7 @@ typedef enum{
     TEXT_ACK,
     TEXT_RESTART,
     TEXT_OK,
+    TEXT_INVALID,
     TEXT_ERROR,
 }  TEXT_ID_e;
 
@@ -129,6 +130,7 @@ TEXT_ID_e TextMessageParse( char * text, UserData_t * userData ){
 
     if ( strcmp (line, KEY_SECRET) != 0 ){
         UART_printf( "Wrong secret(%s). text rejected.\r\n", line);
+        return TEXT_INVALID;
     }
 
     ptText = BuffGetLine( line, ptText );
@@ -198,27 +200,17 @@ bool TextDefaultConfig(void){
 }
 
 
-char * formatTemp( int16_t t, char sT[8] ){
-
-    snprintf(sT, 8, "%d.%d", t/10, abs(t%10) );
-    return sT;
-}
-
-bool TextSendStatusMessage(char *pDest, char * title){
-    extern int16_t T1, T2;
+bool TextSendStatusMessage(char *pDest, bool isConfig, char * title){
     char sA[8], sB[8];
-    bool isConfig;
 
     uint32_t ts = HAL_GetTick()/1000;
 
-    if ( ts < (LastMessageTS + MIN_MESSAGE_INTERVAL) ){
-        UART_printf( "Message not sent (%u/%u)!\r\n", ts, LastMessageTS );
-        return false;
-    }
+    //if ( ts < (LastMessageTS + MIN_MESSAGE_INTERVAL) ){
+    //    UART_printf( "Message not sent (%u/%u)!\r\n", ts, LastMessageTS );
+    //    return false;
+    //}
 
-    UART_printf( "Sending message ! \r\n" );
-
-    isConfig = ( strcmp(title, "Statut") != 0 );
+    UART_printf( "Sending message \"%s\" to %s\r\n", title, pDest );
 
     SIM_StartMessage( pDest );
     HAL_Delay(200);
@@ -228,7 +220,7 @@ bool TextSendStatusMessage(char *pDest, char * title){
 
     if ( ! isConfig ){
         //SIM_WriteText_f("T1:%d T2:%d\n", T1, T2 );
-        SIM_WriteText_f("T1=%s T2=%s\n", formatTemp(T1, sA), formatTemp(T2, sB) );
+        SIM_WriteText_f("T1=%s T2=%s\n", formatTemp(Temp_GetT1(), sA), formatTemp(Temp_GetT2(), sB) );
         HAL_Delay(100);
 
         SIM_WriteText_f("Min=%s Max=%s\n", formatTemp(Temp_HistoryGetMin(), sA), formatTemp(Temp_HistoryGetMax(), sB) );
@@ -260,7 +252,7 @@ bool TextSendStatusMessage(char *pDest, char * title){
     HAL_Delay(200);
 
     if ( ! isConfig ){
-        SIM_WriteText_f("Q:%+d\n", 25 );
+        SIM_WriteText_f("SQ:%d\n", SIM_ReadSignalQuality() );
         HAL_Delay(200);
     }
 
@@ -287,7 +279,7 @@ bool TextIncomingMessageProcess(char * pMess){
 
     if ( rc == TEXT_STATUS ){
         TEXT_Debug( "Status requested\r\n" );
-        TextSendStatusMessage( SenderAddr, "Status");
+        TextSendStatusMessage( SenderAddr, false, "Temperature");
         return true;
     }
 
@@ -296,9 +288,49 @@ bool TextIncomingMessageProcess(char * pMess){
         return false;
     }
 
+    if ( rc == TEXT_INVALID ){
+        return false;
+    }
+
     TEXT_Debug( "New config required\r\n" );
-    TextSendStatusMessage( SenderAddr, "Config");
+    // Store new Config
+    UserData_set( &PermanentData );
+
+    TextSendStatusMessage( SenderAddr, true, "Config");
 
     return true;
 }
 
+// SMS sent at boot time
+bool TextSendInitialMessage(void){
+    return TextSendStatusMessage( PermanentData.User1, true, "Initial");
+}
+
+
+bool TextSendAlarmMessage(TEMP_TH_e status){
+    char * pTitle;
+    if ( status == TEMP_HIGH ){
+        pTitle = "Alarme Haute";
+    }
+    else if ( status == TEMP_LOW ){
+        pTitle = "Alarme Basse";
+    }
+    else{
+        return false;
+    }
+
+    if ( PermanentData.User1[0] == '+' ){
+        TextSendStatusMessage( PermanentData.User1, false, pTitle);
+    }
+    if ( PermanentData.User2[0] == '+' ){
+        TextSendStatusMessage( PermanentData.User2, false, pTitle);
+    }
+    if ( PermanentData.User3[0] == '+' ){
+        TextSendStatusMessage( PermanentData.User3, false, pTitle);
+    }
+    if ( PermanentData.User4[0] == '+' ){
+        TextSendStatusMessage( PermanentData.User4, false, pTitle);
+    }
+
+    return true;
+}

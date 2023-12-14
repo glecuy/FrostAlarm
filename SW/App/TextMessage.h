@@ -10,12 +10,17 @@
 #include "stdint.h"
 #include "stdbool.h"
 
+#include "Temperature.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 bool TextDefaultConfig(void);
+
+bool TextSendInitialMessage(void);
 bool TextSendStatusMessage(char * title);
+bool TextSendAlarmMessage(TEMP_TH_e status);
 
 bool TextIncomingMessageProcess(char * pMess);
 

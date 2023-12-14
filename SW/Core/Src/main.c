@@ -58,6 +58,8 @@ UART_HandleTypeDef huart3;
 
 UserData_t PermanentData;
 
+#define ALARM_REPEAT_SEC  (30*60)
+
 /* USER CODE BEGIN PV */
 #define DEBUG 1
 
@@ -123,6 +125,8 @@ int main(void)
         int16_t signal;
         uint32_t prevTick=0;
         uint16_t Data[4];
+        TEMP_TH_e thStatus;
+        int AlarmRepeatCountDown;
 
         UserLED_off();
 
@@ -132,18 +136,23 @@ int main(void)
 
         Temp_HistoryInit();
 
-        UART_printf( "Hello world ... rc=%d\r\n", rc );
-
         if ( rc == false ){
             TextDefaultConfig();
             UserData_set( &PermanentData );
         }
+        UART_printf( "******* Frost alarm version 0.9 *********\r\n");
 #if 1
         UserDataDump( &PermanentData );
 #endif
 
 #if 1
+        HAL_Delay(3000);
         rc = SIM_Ack();
+        if ( !rc ){
+            UART_printf( "New try ...\r\n" );
+            HAL_Delay(3000);
+            rc = SIM_Ack();
+        }
         if ( rc ){
             // Give some time to connect to network
             LED_ORANGE_on();
@@ -160,7 +169,7 @@ int main(void)
                 LED_ORANGE_on();
             SIM_ConfigureForText();
             // Clear all messages
-            //SIM_ClearAll();
+            SIM_ClearAll();
         }
 #endif
 
@@ -169,7 +178,8 @@ int main(void)
         rc = TLY26_ReadWords( 0x200, Data, 2 );
         Temp_NewValues( (int16_t)Data[0], (int16_t)Data[1] );
 
-        //TextSendStatusMessage("Initial");
+        //TextSendInitialMessage();
+        AlarmRepeatCountDown = ALARM_REPEAT_SEC;
 #endif
 
         /* USER CODE END 2 */
@@ -180,17 +190,20 @@ int main(void)
         {
             /* USER CODE END WHILE */
             uint32_t t = HAL_GetTick();
+            // Soft reset every 10 days. TODO ???
+            if ( t > 0xFFFF0000 )
+                HAL_NVIC_SystemReset();
             if ( t >= (prevTick+5000) ){
                 prevTick = t;
 
-                rc = SIM_CheckSMS();
 
+                rc = SIM_CheckSMS();
                 if ( rc ){
                     // Process message
                     SIM_ProcessSMS();
 
                     // Delete message
-                    //SIM_ClearAll();
+                    SIM_ClearAll();
                 }
 
                 //SIM_Wait();
@@ -199,6 +212,16 @@ int main(void)
                 rc = TLY26_ReadWords( 0x200, Data, 2 );
                 Temp_NewValues( (int16_t)Data[0], (int16_t)Data[1] );
                 //UART_printf( "Tmin=+%d - Tmax=+%d\r\n", (int)Temp_HistoryGetMin(), (int)Temp_HistoryGetMax() );
+
+                AlarmRepeatCountDown -= 5;
+                if ( AlarmRepeatCountDown < 0 ){
+                    AlarmRepeatCountDown = 0;
+                }
+                thStatus = Temp_AlarmsCheck();
+                if ( thStatus != TEMP_NORMAL && (AlarmRepeatCountDown==0) ){
+                    TextSendAlarmMessage(thStatus);
+                    AlarmRepeatCountDown = ALARM_REPEAT_SEC;
+                }
             }
 
 
@@ -208,6 +231,7 @@ int main(void)
     }
     /* USER CODE END 3 */
 }
+
 /**
   * @brief System Clock Configuration
   * @retval None
@@ -242,7 +266,7 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
-}
+  }
 
 /**
   * @brief TIM3 Initialization Function
@@ -410,7 +434,8 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1|GPIO_PIN_5|GPIO_PIN_6|GPIO_PIN_7, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1|GPIO_PIN_5|GPIO_PIN_6|GPIO_PIN_7
+                          |GPIO_PIN_15, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : PC13 (BluePill LED)*/
   GPIO_InitStruct.Pin = GPIO_PIN_13;
@@ -419,10 +444,10 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pins :   PA1
-   *                        PA5 PA6 PA7
-   *                        PA15 ?? */
-  GPIO_InitStruct.Pin = GPIO_PIN_1|GPIO_PIN_5|GPIO_PIN_6|GPIO_PIN_7;
+  /*Configure GPIO pins : PA1 PA5 PA6 PA7
+                          PA15 */
+  GPIO_InitStruct.Pin = GPIO_PIN_1|GPIO_PIN_5|GPIO_PIN_6|GPIO_PIN_7
+                        |GPIO_PIN_15;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;

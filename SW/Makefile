@@ -40,7 +40,6 @@ Core/Src/main.c \
 Core/Src/stm32f1xx_it.c \
 Core/Src/stm32f1xx_hal_msp.c \
 Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_gpio_ex.c \
-Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_crc.c \
 Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal.c \
 Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_rcc.c \
 Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_rcc_ex.c \
@@ -54,7 +53,9 @@ Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_exti.c \
 Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_tim.c \
 Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_tim_ex.c \
 Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_uart.c \
-Core/Src/system_stm32f1xx.c
+Core/Src/system_stm32f1xx.c \
+Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_adc.c \
+Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_adc_ex.c
 
 C_SOURCES += \
 App/UserData.c \

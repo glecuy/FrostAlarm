@@ -255,6 +255,9 @@ int16_t SIM_ReadSignalQuality( void ){
     // Parse +CSQ: 27,0
     int16_t value = -1;
 
+    // Wait a while
+    HAL_Delay(4000);
+
     SIM_SendCommand("+CSQ");    //Signal quality
 
     // TODO
@@ -297,6 +300,10 @@ bool SIM_Ack(void){
 
     // HW reset ??
     UART_printf( "Configuring SIM card ...\r\n" );
+    HAL_GPIO_WritePin  (SIM800L_Reset_Port, SIM800L_Reset_Pin, GPIO_PIN_RESET);
+    HAL_Delay(1000);
+    HAL_GPIO_WritePin  (SIM800L_Reset_Port, SIM800L_Reset_Pin, GPIO_PIN_SET);
+    HAL_Delay(200);
 
     SIM_SendCommand("E0");       //Disable echo
     SIM_SendCommand("I");        //Identification
@@ -305,20 +312,19 @@ bool SIM_Ack(void){
     r = SIM_SendCommand("+CPIN?");
 
     // TODO test response READY or NOT READY ? (+CPIN: READY)
-    if ( SIM_IsReady( (char*)SimRxLine) ){
+    if ( SIM_IsReady( (char*)SimRxBuffer) ){
         UART_printf( "SIM Ready\r\n" );
     }
     else{
+        HAL_Delay(500);
         UART_printf( "Setting PIN code\r\n" );
-        SIM_SendCommand("+CPIN=\"1234\"");
+        r = SIM_SendCommand("+CPIN=\"1234\"");
     }
 
-    HAL_Delay(500);
-
+    HAL_Delay(1000);
     r = SIM_SendCommand(""); // ACK command
 
     LED_SIM_OK_off();
-
     if ( r == SIM_OK ){
         return true;
     }
@@ -330,14 +336,14 @@ bool SIM_Ack(void){
 bool SIM_CheckSimStatus(void){
     HAL_Delay(500);
     SIM_SendCommand("+CCID");   //Read SIM information to confirm whether the SIM is plugged
-    UART_printf( "SIM ID: %s\r\n", SimRxLine );
+    UART_printf( "SIM ID: %s\r\n", SimRxBuffer );
     HAL_Delay(100);
 
     SIM_SendCommand("+CREG=?");  //Check whether it has registered in the network
     HAL_Delay(100);
 
     SIM_SendCommand("+COPS ?");
-    UART_printf( "SIM OPS: %s\r\n", SimRxLine );
+    UART_printf( "SIM OPS: %s\r\n", SimRxBuffer );
     HAL_Delay(100);
 
     // TODO test quality, operator list, ...
@@ -348,11 +354,24 @@ bool SIM_CheckSimStatus(void){
 
 
 void SIM_ClearAll( void ){
+    char * cmd="AT+CMGD=1,4\r";
+    HAL_UART_Transmit(&huart1, (uint8_t*)cmd, strlen(cmd), 100 );
+    SIM_WaitForData(10000);  // 5s(delete 1 message)
+
+    // second command
+    cmd="AT+CMGDA= \"DEL ALL\"\r";
+    HAL_UART_Transmit(&huart1, (uint8_t*)cmd, strlen(cmd), 100 );
+    SIM_WaitForData(10000);  // 5s(delete 1 message)
+}
+
+void SIM_ClearAll_OFF( void ){
+    bool rc1, rc2;
     //delete all sms
-    SIM_SendCommand("+CMGD=1,4");
+    rc1 = SIM_SendCommand("+CMGD=1,4");
     HAL_Delay(1000);
-    SIM_SendCommand("+CMGDA= \"DEL ALL\"");
+    rc2 = SIM_SendCommand("+CMGDA= \"DEL ALL\"");
     HAL_Delay(1000);
+    UART_printf( "SIM_ClearAll: %d %d\r\n", rc1, rc2 );
 }
 
 
@@ -369,7 +388,7 @@ bool SIM_ConfigureForText(void){
     //SIM_SendCommand("+CNMI=1,2,0,0,0");
     // Do not route SMS to serial, (No SMS-DELIVER notification)
     SIM_SendCommand("+CNMI=0,0,0,0,0");
-    HAL_Delay(100);
+    HAL_Delay(500);
 
     //// Save configuration
     //SIM_SendCommand("&W");
@@ -397,8 +416,6 @@ This buffer can simply be cleared by executing the command at+cmgda="DEL ALL"
 bool SIM_CheckSMS(void){
     if ( SIM_OK_WITH_DATA == SIM_SendCommand("+CMGL=\"ALL\"") ){
         UART_printf( "Message: %s\r\n", SimRxBuffer );
-
-
         return true;
     }
     else{
