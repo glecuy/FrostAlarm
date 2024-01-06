@@ -26,6 +26,8 @@ int16_t Temp_HistoryGetMin( void );
 int16_t Temp_GetT1( void );
 int16_t Temp_GetT2( void );
 
+int16_t Temp_GetT_Case( void );
+
 char * formatTemp( int16_t t, char * str );
 
 TEMP_TH_e Temp_AlarmsCheck( void );

@@ -148,7 +148,11 @@ int16_t Temp_GetT2( void )
     return T2;
 }
 
-
+int16_t Temp_GetT_Case( void )
+{
+    extern int16_t T_Case;
+    return T_Case;
+}
 
 
 void Temp_NewValues( int16_t temp1, int16_t temp2){

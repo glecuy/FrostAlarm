@@ -252,9 +252,13 @@ bool TextSendStatusMessage(char *pDest, bool isConfig, char * title){
     HAL_Delay(200);
 
     if ( ! isConfig ){
-        SIM_WriteText_f("SQ:%d\n", SIM_ReadSignalQuality() );
+        SIM_WriteText_f("SQ:%d\n", SIM_GetSignalQuality() );
         HAL_Delay(200);
     }
+
+    // Send Case internal temperature
+    SIM_WriteText_f("TCase=%s\n", formatTemp(Temp_GetT_Case(), sA) );
+    HAL_Delay(100);
 
     // Current time stamp
     SIM_WriteText_f("TS:%07u\n", ts );

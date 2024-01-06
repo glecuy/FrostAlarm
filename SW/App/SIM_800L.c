@@ -258,7 +258,7 @@ int16_t SIM_ReadSignalQuality( void ){
     // Wait a while
     HAL_Delay(4000);
 
-    SIM_SendCommand("+CSQ");    //Signal quality
+    SIM_SendCommand("+CSQ");    // Signal quality
 
     // TODO
     char * ptr = strstr((char*)SimRxBuffer, "CSQ:" );

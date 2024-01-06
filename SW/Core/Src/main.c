@@ -50,6 +50,8 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+ADC_HandleTypeDef hadc1;
+
 TIM_HandleTypeDef htim3;
 
 UART_HandleTypeDef huart1;
@@ -58,10 +60,12 @@ UART_HandleTypeDef huart3;
 
 UserData_t PermanentData;
 
+int16_t T_Case;
+
 #define ALARM_REPEAT_SEC  (30*60)
 
 /* USER CODE BEGIN PV */
-#define DEBUG 1
+//#define DEBUG 1
 
 #ifdef DEBUG
   #define MAIN_Debug(...) UART_printf(__VA_ARGS__)
@@ -78,12 +82,50 @@ static void MX_USART1_UART_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_TIM3_Init(void);
+static void MX_ADC1_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+
+/* http://micropeta.com/video33
+*/
+/* Data sheet says
+ * Avg_Slope        = 4.3 mv/°C (typ)
+ * Voltage at 25 °C = 1.43 V
+ * Obtain the temperature using the following formula:
+ * Temperature (in °C) = {(V25 - VSENSE) / Avg_Slope} + 25.
+ * T = ((1.43 - 3.3/4096 * rawValue) / 0.0043) + 25
+ * ((1.43 - 3.31/4096 * 1500) / 0.0043) + 25 = 75.66
+ *  (1430000 - 3310000/4096 * 1500)
+ * test:    51°C => 1560
+ *          27   => 1678
+ *          19
+ ***********************************************/
+#define VDD_VOLTAGE (3320000)
+#define TEMP_OFFSET (-1200)
+int16_t GetMCU_Temperature( void ){
+    uint32_t rawValue;
+    int32_t temperature;
+
+    HAL_ADC_PollForConversion(&hadc1, 1000);
+
+    rawValue = HAL_ADC_GetValue(&hadc1);
+
+    // rawValue = 1500
+    // ((1.43 - 3.31/4096 * 1500) / 0.0043) + 25   = 75.66
+    // ((1430000 - 3310000/4096 * 1500)/43) + 2500 = 7566
+
+    temperature = ((1430000 - VDD_VOLTAGE/4096 * rawValue)/43) + 2500 + TEMP_OFFSET;
+    temperature /= 10;
+
+    MAIN_Debug("MCU Temperature myTemp = %u temperature=%+d\r\n", rawValue, temperature );
+
+    return (int16_t)temperature;
+}
 
 /* USER CODE END 0 */
 
@@ -119,6 +161,7 @@ int main(void)
   MX_USART2_UART_Init();
   MX_USART3_UART_Init();
   MX_TIM3_Init();
+  MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
     {
         bool rc;
@@ -140,7 +183,7 @@ int main(void)
             TextDefaultConfig();
             UserData_set( &PermanentData );
         }
-        UART_printf( "******* Frost alarm version 0.9 *********\r\n");
+        UART_printf( "******* Frost alarm version 0.92 *********\r\n");
 #if 1
         UserDataDump( &PermanentData );
 #endif
@@ -196,6 +239,8 @@ int main(void)
             if ( t >= (prevTick+5000) ){
                 prevTick = t;
 
+                // Read Case temperature and store it
+                T_Case = GetMCU_Temperature();
 
                 rc = SIM_CheckSMS();
                 if ( rc ){
@@ -240,6 +285,7 @@ void SystemClock_Config(void)
 {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+  RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
 
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
@@ -266,6 +312,61 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_ADC;
+  PeriphClkInit.AdcClockSelection = RCC_ADCPCLK2_DIV2;
+  if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
+  {
+    Error_Handler();
+  }
+}
+
+/**
+  * @brief ADC1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_ADC1_Init(void)
+{
+
+  /* USER CODE BEGIN ADC1_Init 0 */
+
+  /* USER CODE END ADC1_Init 0 */
+
+  ADC_ChannelConfTypeDef sConfig = {0};
+
+  /* USER CODE BEGIN ADC1_Init 1 */
+
+  /* USER CODE END ADC1_Init 1 */
+
+  /** Common config
+  */
+  hadc1.Instance = ADC1;
+  hadc1.Init.ScanConvMode = ADC_SCAN_DISABLE;
+  hadc1.Init.ContinuousConvMode = ENABLE;
+  hadc1.Init.DiscontinuousConvMode = DISABLE;
+  hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+  hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
+  hadc1.Init.NbrOfConversion = 1;
+  if (HAL_ADC_Init(&hadc1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  */
+  sConfig.Channel = ADC_CHANNEL_TEMPSENSOR;
+  sConfig.Rank = ADC_REGULAR_RANK_1;
+  sConfig.SamplingTime = ADC_SAMPLETIME_55CYCLES_5;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN ADC1_Init 2 */
+
+  HAL_ADC_Start(&hadc1);
+
+  /* USER CODE END ADC1_Init 2 */
+
   }
 
 /**
