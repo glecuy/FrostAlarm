@@ -26,7 +26,7 @@
 
 int16_t T1, T2;
 
-uint16_t TempLow, TempHigh;
+uint16_t TempLow, TempHigh, TempError;
 
 
 extern UserData_t PermanentData;
@@ -163,21 +163,32 @@ void Temp_NewValues( int16_t temp1, int16_t temp2){
     //UART_printf( "T1=%d, T2=%d\r\n", (int)temp1, (int)temp2 );
 }
 
+void Temp_SetError( void ){
+    T1 = TEMP_16_UNDEF;
+    T2 = TEMP_16_UNDEF;
+}
+
+
 /*
  * Test T1 temperature against defined thresholds
  * 3 in a raw shall trig an alarm
  ***************************************************/
 TEMP_TH_e Temp_AlarmsCheck( void ){
 
-    if( T1 < PermanentData.L_Thresholds ){
-        TempLow++;
+    if ( T1 == TEMP_16_UNDEF || T2 == TEMP_16_UNDEF ){
+        TempError++;
     } else {
-        TempLow = 0;
-    }
-    if( T1 > PermanentData.H_Thresholds ){
-        TempHigh++;
-    } else {
-        TempHigh = 0;
+        TempError = 0;
+        if( T1 < PermanentData.L_Thresholds ){
+            TempLow++;
+        } else {
+            TempLow = 0;
+        }
+        if( T1 > PermanentData.H_Thresholds ){
+            TempHigh++;
+        } else {
+            TempHigh = 0;
+        }
     }
 
     if ( TempHigh >= 3 ){
@@ -185,6 +196,9 @@ TEMP_TH_e Temp_AlarmsCheck( void ){
     }
     else if ( TempLow >= 3 ){
         return TEMP_LOW;
+    }
+    else if ( TempError >= 3 ){
+        return TEMP_ERROR;
     }
     else{
         return TEMP_NORMAL;

@@ -15,10 +15,12 @@ void Temp_HistoryInit( void );
 typedef enum{
     TEMP_NORMAL,
     TEMP_HIGH,
-    TEMP_LOW
+    TEMP_LOW,
+    TEMP_ERROR
 }  TEMP_TH_e;
 
 void Temp_NewValues( int16_t temp1, int16_t temp2);
+void Temp_SetError( void );
 
 int16_t Temp_HistoryGetMax( void );
 int16_t Temp_HistoryGetMin( void );

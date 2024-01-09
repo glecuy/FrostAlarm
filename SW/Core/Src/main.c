@@ -62,7 +62,15 @@ UserData_t PermanentData;
 
 int16_t T_Case;
 
-#define ALARM_REPEAT_SEC  (30*60)
+int AlarmRepeatCountDown;
+int AlarmCallCountDown;
+int AlarmNextUserCountDown;
+
+#define ALARM_0_DELAY_SEC       (5*60)
+#define ALARM_REPEAT_SEC        (60*60)   // Re-send alarm after some time
+#define ALARM_NEXT_USER_SEC     (10*60)   // Send alarm to the next user
+#define ALARM_CALL_DURATION_SEC (100)      // Max Alarm call duration
+
 
 /* USER CODE BEGIN PV */
 //#define DEBUG 1
@@ -115,11 +123,12 @@ int16_t GetMCU_Temperature( void ){
 
     rawValue = HAL_ADC_GetValue(&hadc1);
 
-    // rawValue = 1500
-    // ((1.43 - 3.31/4096 * 1500) / 0.0043) + 25   = 75.66
-    // ((1430000 - 3310000/4096 * 1500)/43) + 2500 = 7566
+    // Buggy line ?
+    //temperature = ((1430000 - VDD_VOLTAGE/4096 * rawValue)/43) + 2500 + TEMP_OFFSET;
 
-    temperature = ((1430000 - VDD_VOLTAGE/4096 * rawValue)/43) + 2500 + TEMP_OFFSET;
+    temperature = (1430000 - VDD_VOLTAGE/4096 * rawValue);
+    temperature /= 43;
+    temperature += 2500 + TEMP_OFFSET;
     temperature /= 10;
 
     MAIN_Debug("MCU Temperature myTemp = %u temperature=%+d\r\n", rawValue, temperature );
@@ -165,11 +174,11 @@ int main(void)
   /* USER CODE BEGIN 2 */
     {
         bool rc;
+        int alarmUser;
         int16_t signal;
         uint32_t prevTick=0;
         uint16_t Data[4];
         TEMP_TH_e thStatus;
-        int AlarmRepeatCountDown;
 
         UserLED_off();
 
@@ -183,7 +192,7 @@ int main(void)
             TextDefaultConfig();
             UserData_set( &PermanentData );
         }
-        UART_printf( "******* Frost alarm version 0.92 *********\r\n");
+        UART_printf( "******* Frost alarm version 0.95 *********\r\n");
 #if 1
         UserDataDump( &PermanentData );
 #endif
@@ -221,8 +230,18 @@ int main(void)
         rc = TLY26_ReadWords( 0x200, Data, 2 );
         Temp_NewValues( (int16_t)Data[0], (int16_t)Data[1] );
 
-        //TextSendInitialMessage();
-        AlarmRepeatCountDown = ALARM_REPEAT_SEC;
+// TODO
+        TextSendInitialMessage();
+        AlarmRepeatCountDown = ALARM_0_DELAY_SEC;
+        AlarmNextUserCountDown = ALARM_0_DELAY_SEC;
+
+        alarmUser = 0;
+
+        //HAL_Delay(2000);
+        //MAIN_Debug("Dialing...");
+        //SIM_DebugCmd();       //Dial
+
+
 #endif
 
         /* USER CODE END 2 */
@@ -245,8 +264,14 @@ int main(void)
                 rc = SIM_CheckSMS();
                 if ( rc ){
                     // Process message
-                    SIM_ProcessSMS();
+                    bool messOk =  SIM_ProcessSMS();
 
+                    if  ( messOk ){
+                        // Acknowledge Alarm
+                        AlarmRepeatCountDown = ALARM_REPEAT_SEC;
+                        AlarmNextUserCountDown = ALARM_NEXT_USER_SEC;
+                        alarmUser = 0;
+                    }
                     // Delete message
                     SIM_ClearAll();
                 }
@@ -255,17 +280,47 @@ int main(void)
 
                 //UserLED_toggle();
                 rc = TLY26_ReadWords( 0x200, Data, 2 );
-                Temp_NewValues( (int16_t)Data[0], (int16_t)Data[1] );
+                if ( rc ){
+                    Temp_NewValues( (int16_t)Data[0], (int16_t)Data[1] );
+                }
+                else{
+                    Temp_SetError();
+                }
                 //UART_printf( "Tmin=+%d - Tmax=+%d\r\n", (int)Temp_HistoryGetMin(), (int)Temp_HistoryGetMax() );
 
                 AlarmRepeatCountDown -= 5;
                 if ( AlarmRepeatCountDown < 0 ){
                     AlarmRepeatCountDown = 0;
                 }
+
+                AlarmNextUserCountDown -= 5;
+                if ( AlarmNextUserCountDown < 0 ){
+                    AlarmNextUserCountDown = 0;
+                }
+
+                if ( AlarmCallCountDown > 0 ){
+                    AlarmCallCountDown -= 5;
+                    if ( AlarmCallCountDown <= 0 ){
+                        HangUpCall();
+                    }
+                }
+
+                MAIN_Debug("CountDown: %d %d %d\r\n", AlarmRepeatCountDown, AlarmNextUserCountDown, AlarmCallCountDown );
+
                 thStatus = Temp_AlarmsCheck();
-                if ( thStatus != TEMP_NORMAL && (AlarmRepeatCountDown==0) ){
-                    TextSendAlarmMessage(thStatus);
-                    AlarmRepeatCountDown = ALARM_REPEAT_SEC;
+                if ( thStatus != TEMP_NORMAL && (AlarmRepeatCountDown==0)  && (AlarmNextUserCountDown==0) ){
+                    bool done = TextSendAlarm(thStatus, alarmUser);
+                    if ( done ){
+                        AlarmNextUserCountDown  = ALARM_NEXT_USER_SEC;
+                        AlarmCallCountDown      = ALARM_CALL_DURATION_SEC;
+                        alarmUser++;
+                    }
+                    else{
+                        // End of cycle, all users notified
+                        AlarmRepeatCountDown = ALARM_REPEAT_SEC;
+                        AlarmNextUserCountDown = ALARM_NEXT_USER_SEC;
+                        alarmUser = 0;
+                    }
                 }
             }
 

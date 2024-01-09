@@ -21,6 +21,7 @@
 #define KEY_SECRET ":Secret"
 
 #define KEY_STATUS ":Statut"
+#define KEY_CONFIG ":Config"
 
 #define LINE_MAX_LEN 40  // Large enough to get phone number
 
@@ -135,15 +136,15 @@ TEXT_ID_e TextMessageParse( char * text, UserData_t * userData ){
 
     ptText = BuffGetLine( line, ptText );
     TEXT_Debug("%s\r\n", line );
-    if ( strcasecmp (line, KEY_STATUS) == 0 ){
-        // Status requested
-        return TEXT_STATUS;
-    }
 
-    while (ptText != NULL ){
-        ptText = BuffGetLine( line, ptText );
-        TEXT_Debug("(%d)%s\n", (int)strlen(line), line );
-        ReadLineParam( line, userData );
+    if ( strcasecmp (line, KEY_CONFIG) == 0 ){
+        // Config requested, parse parameters
+        while (ptText != NULL ){
+            ptText = BuffGetLine( line, ptText );
+            TEXT_Debug("(%d)%s\n", (int)strlen(line), line );
+            ReadLineParam( line, userData );
+        }
+        return TEXT_CONFIG;
     }
 
     return TEXT_OK;
@@ -197,6 +198,24 @@ bool TextDefaultConfig(void){
     TEXT_Debug( "Size of config: %d\r\n", default_cfg_txt_size() );
     memset( &PermanentData, 0xFF, sizeof(UserData_t) );
     return (TEXT_ERROR != TextMessageParse( (char*)default_cfg_txt, &PermanentData ) );
+}
+
+bool IsValidUser( char * user ){
+
+    if ( strncmp (PermanentData.User1, user, USER_DATA_PHONE_NUMBER_LEN ) == 0 ){
+        return true;
+    }
+    if ( strncmp (PermanentData.User2, user, USER_DATA_PHONE_NUMBER_LEN ) == 0 ){
+        return true;
+    }
+    if ( strncmp (PermanentData.User3, user, USER_DATA_PHONE_NUMBER_LEN ) == 0 ){
+        return true;
+    }
+    if ( strncmp (PermanentData.User4, user, USER_DATA_PHONE_NUMBER_LEN ) == 0 ){
+        return true;
+    }
+
+    return false;
 }
 
 
@@ -271,8 +290,15 @@ bool TextSendStatusMessage(char *pDest, bool isConfig, char * title){
 }
 
 
+
+/*
+ * Process message and return true if message is considered
+ * as an acknowlegment.
+ *
+ ***************************************************/
 bool TextIncomingMessageProcess(char * pMess){
     char * ptText = pMess;
+    bool ack=false;
     TEXT_ID_e rc;
 
     ptText = TextMessageHeaderParse( ptText );
@@ -281,28 +307,33 @@ bool TextIncomingMessageProcess(char * pMess){
 
     rc = TextMessageParse( ptText, &PermanentData );
 
-    if ( rc == TEXT_STATUS ){
-        TEXT_Debug( "Status requested\r\n" );
-        TextSendStatusMessage( SenderAddr, false, "Temperature");
-        return true;
-    }
-
-    if ( rc == TEXT_ERROR ){
-        TEXT_Debug( "Text parsing error !\r\n" );
-        return false;
-    }
-
     if ( rc == TEXT_INVALID ){
         return false;
     }
 
-    TEXT_Debug( "New config required\r\n" );
-    // Store new Config
-    UserData_set( &PermanentData );
+    if ( IsValidUser(SenderAddr) ){
+        ack = true;
+    }
 
-    TextSendStatusMessage( SenderAddr, true, "Config");
+    if ( rc == TEXT_CONFIG ){
+        TEXT_Debug( "New config required\r\n" );
+        // Store new Config
+        UserData_set( &PermanentData );
 
-    return true;
+        TextSendStatusMessage( SenderAddr, true, "Config");
+        return ack;
+    }
+
+    if ( rc == TEXT_ERROR ){
+        TEXT_Debug( "Text parsing error !\r\n" );
+        return ack;
+    }
+
+    // Send status by default
+    TEXT_Debug( "Status requested\r\n" );
+    TextSendStatusMessage( SenderAddr, false, "Temperature");
+
+    return ack;
 }
 
 // SMS sent at boot time
@@ -310,31 +341,47 @@ bool TextSendInitialMessage(void){
     return TextSendStatusMessage( PermanentData.User1, true, "Initial");
 }
 
-
-bool TextSendAlarmMessage(TEMP_TH_e status){
+/*
+ * Send Alarm to user
+ * Text + Call
+ *
+ *******************************************************/
+bool TextSendAlarm(TEMP_TH_e status, int userNo ){
     char * pTitle;
+    char * user =  NULL;
+
     if ( status == TEMP_HIGH ){
         pTitle = "Alarme Haute";
     }
     else if ( status == TEMP_LOW ){
         pTitle = "Alarme Basse";
     }
+    else if ( status == TEMP_ERROR ){
+        pTitle = "Systeme en PANNE";
+    }
     else{
         return false;
     }
 
-    if ( PermanentData.User1[0] == '+' ){
-        TextSendStatusMessage( PermanentData.User1, false, pTitle);
+    if ( userNo==0 && PermanentData.User1[0] == '+' ){
+        user = PermanentData.User1;
     }
-    if ( PermanentData.User2[0] == '+' ){
-        TextSendStatusMessage( PermanentData.User2, false, pTitle);
+    if ( userNo==1 && PermanentData.User2[0] == '+' ){
+        user = PermanentData.User2;
     }
-    if ( PermanentData.User3[0] == '+' ){
-        TextSendStatusMessage( PermanentData.User3, false, pTitle);
+    if ( userNo==2 && PermanentData.User3[0] == '+' ){
+        user = PermanentData.User3;
     }
-    if ( PermanentData.User4[0] == '+' ){
-        TextSendStatusMessage( PermanentData.User4, false, pTitle);
+    if ( userNo==3 && PermanentData.User4[0] == '+' ){
+        user = PermanentData.User4;
     }
 
-    return true;
+    if ( user != NULL ){
+        TextSendStatusMessage( user, false, pTitle);
+        // Wait a while
+        HAL_Delay(5000);
+        MakeAnAlarmCall(user);
+    }
+
+    return ( user != NULL );
 }

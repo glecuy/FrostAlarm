@@ -20,7 +20,7 @@ bool TextDefaultConfig(void);
 
 bool TextSendInitialMessage(void);
 bool TextSendStatusMessage(char * title);
-bool TextSendAlarmMessage(TEMP_TH_e status);
+bool TextSendAlarm(TEMP_TH_e status, int userNo );
 
 bool TextIncomingMessageProcess(char * pMess);
 

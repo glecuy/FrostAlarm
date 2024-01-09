@@ -30,6 +30,9 @@ bool SIM_ConfigureForText(void);
 bool SIM_CheckSMS(void);
 bool SIM_ProcessSMS(void);
 
+bool MakeAnAlarmCall(char *pDest);
+bool HangUpCall();
+
 bool SIM_Wait( void );
 
 int16_t SIM_ReadSignalQuality( void );
@@ -39,6 +42,8 @@ bool SIM_WriteText( char * text );
 bool SIM_WriteText_f( const char *fmt, ...);
 bool SIM_StartMessage( char * phoneNumber );
 bool SIM_WriteEndOfMessage( void );
+
+void SIM_DebugCmd(void);
 
 void SIM_FlushRxComm( char * tag );
 

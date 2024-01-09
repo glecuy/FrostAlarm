@@ -203,12 +203,6 @@ void SIM_FlushRxComm( char * tag ){
 }
 
 
-bool SIM_SendSms( char * TextMess ){
-
-
-    return true;
-}
-
 
 bool SIM_IsReady( char * Response ){
     // Search ": READY"
@@ -352,6 +346,29 @@ bool SIM_CheckSimStatus(void){
 }
 
 
+bool MakeAnAlarmCall(char *pDest){
+    UART_printf( "Making a call to %s\r\n", pDest );
+
+    HAL_Delay(500);
+
+    // Dial phone number
+    SIM_WriteText_f("ATD%s;\r", pDest );
+    HAL_Delay(100);
+
+    return true;
+}
+
+
+bool HangUpCall(char *pDest){
+    UART_printf( "Hang up\r\n" );
+
+    SIM_WriteText_f("ATH\r");
+    HAL_Delay(100);
+
+    return true;
+}
+
+
 
 void SIM_ClearAll( void ){
     char * cmd="AT+CMGD=1,4\r";
@@ -424,8 +441,17 @@ bool SIM_CheckSMS(void){
 }
 
 
+/*
+ * Process message and return true if message is considered
+ * as an acknowlegment.
+ *
+ ***************************************************/
 bool SIM_ProcessSMS(void){
     return TextIncomingMessageProcess((char *)SimRxBuffer);
 }
 
+
+void SIM_DebugCmd(void){
+        //SIM_WriteText_f("ATD%s;\r", pDest );
+}
 
