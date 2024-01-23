@@ -315,7 +315,7 @@ bool TextIncomingMessageProcess(char * pMess){
         ack = true;
     }
 
-    if ( rc == TEXT_CONFIG ){
+    if ( ack && rc == TEXT_CONFIG ){
         TEXT_Debug( "New config required\r\n" );
         // Store new Config
         UserData_set( &PermanentData );

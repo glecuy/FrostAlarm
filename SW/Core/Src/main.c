@@ -226,23 +226,19 @@ int main(void)
 #endif
 
 
-#if 1
         rc = TLY26_ReadWords( 0x200, Data, 2 );
         Temp_NewValues( (int16_t)Data[0], (int16_t)Data[1] );
 
-// TODO
         TextSendInitialMessage();
         AlarmRepeatCountDown = ALARM_0_DELAY_SEC;
         AlarmNextUserCountDown = ALARM_0_DELAY_SEC;
 
-        alarmUser = 0;
-
-        //HAL_Delay(2000);
-        //MAIN_Debug("Dialing...");
-        //SIM_DebugCmd();       //Dial
-
-
+#ifdef DEBUG
+        AlarmRepeatCountDown = 100;
+        AlarmNextUserCountDown = 100;
 #endif
+
+        alarmUser = 0;
 
         /* USER CODE END 2 */
 

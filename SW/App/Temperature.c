@@ -24,6 +24,15 @@
 
 #define TEMP_HISTORY_N_MAX (TEMP_HISTORY_DEPTH_SEC/(TEMP_HISTORY_DEPTH_PTS)/TEMP_TICK)
 
+
+//#define DEBUG 1
+
+#ifdef DEBUG
+  #define TEMP_Debug(...) UART_printf(__VA_ARGS__)
+#else
+  #define TEMP_Debug(...) (void)0
+#endif
+
 int16_t T1, T2;
 
 uint16_t TempLow, TempHigh, TempError;
@@ -177,10 +186,12 @@ TEMP_TH_e Temp_AlarmsCheck( void ){
 
     if ( T1 == TEMP_16_UNDEF || T2 == TEMP_16_UNDEF ){
         TempError++;
+        TEMP_Debug("TempError = %u\r\n", TempError);
     } else {
         TempError = 0;
         if( T1 < PermanentData.L_Thresholds ){
             TempLow++;
+            TEMP_Debug("TempLow = %u\r\n", TempLow);
         } else {
             TempLow = 0;
         }
